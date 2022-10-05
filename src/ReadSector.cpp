@@ -12,6 +12,7 @@ uint16_t swap_uint16(uint16_t val);
 uint32_t swap_uint32(uint32_t val);
 uint64_t swap_uint64(uint64_t val);
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime);
+unsigned int reverseBits(unsigned int num);
 
 int ReadSector(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE sector[512])
 {
@@ -73,20 +74,26 @@ void getMFTEntry(int64_t startCluster, int64_t sectorPerCluster)
     writeSectorToFile(sector, "MFT.bin");
 }
 
-struct StandardInformationHeader
+struct StandardAttributeHeader
 {
     uint32_t signature;
     uint32_t length;
     uint8_t nonResidentFlag;
     uint8_t nameLength;
     uint16_t nameOffset;
+    uint16_t flags;
+    uint16_t attrID;
+    uint32_t attrLength;
+    uint16_t offsetToAttrData;
+    uint8_t indexFlag;
+    uint8_t padding;
 };
 
 struct StandardInformation
 {
     uint64_t fileCreated;
     uint64_t fileModified;
-    uint64_t recordChanged;
+    uint64_t MFTChanged;
     uint64_t lastAccessTime;
     uint32_t filePermissions;
 };
@@ -94,32 +101,22 @@ struct StandardInformation
 void readStandardInformation()
 {
     FILE *fp = fopen("MFT.bin", "rb");
-
-    StandardInformationHeader sih;
     fseek(fp, 56, SEEK_SET);
-    fread(&sih, sizeof(sih), 1, fp);
 
-    swap_uint32(sih.signature);
-    swap_uint32(sih.length);
-    swap_uint16(sih.nameOffset);
-    cout << sih.signature << endl;
-    cout << sih.length << endl;
-    cout << sih.nonResidentFlag << endl;
-    cout << sih.nameLength << endl;
-    cout << sih.nameOffset << endl;
+    StandardAttributeHeader sah;
+    fread(&sah, sizeof(sah), 1, fp);
+
+    // # cần lấy thông tin nào thì lật ngược bit rồi xuất ra.
+    cout << sah.signature << endl;
+    cout << sah.length << endl;
+    cout << sah.attrLength << endl;
 
     StandardInformation si;
-    fseek(fp, 80, SEEK_SET);
     fread(&si, sizeof(si), 1, fp);
 
-    swap_uint64(si.fileCreated);
-    swap_uint64(si.fileModified);
-    swap_uint64(si.recordChanged);
-    swap_uint64(si.lastAccessTime);
-    swap_uint32(si.filePermissions);
     convertFileTimeToDateTime(si.fileCreated);
     convertFileTimeToDateTime(si.fileModified);
-    convertFileTimeToDateTime(si.recordChanged);
+    convertFileTimeToDateTime(si.MFTChanged);
     convertFileTimeToDateTime(si.lastAccessTime);
     cout << si.filePermissions << endl;
 
@@ -163,6 +160,50 @@ uint64_t swap_uint64(uint64_t val)
     return (val << 32) | (val >> 32);
 }
 
+struct FileName
+{
+    uint64_t fileReferenceToParentDir;
+    uint64_t fileCreated;
+    uint64_t fileModified;
+    uint64_t MFTChanged;
+    uint64_t lastAccessTime;
+    uint64_t allocatedSize;
+    uint64_t realSize;
+    uint32_t fileAttributes;
+    uint32_t reparse;
+    uint8_t fileNameLength;
+    uint8_t fileNameFormat;
+    uint64_t fileName;
+};
+
+void readFileName()
+{
+    FILE *fp = fopen("MFT.bin", "rb");
+    fseek(fp, 152, SEEK_SET);
+
+    StandardAttributeHeader sah;
+    fread(&sah, sizeof(sah), 1, fp);
+
+    cout << sah.signature << endl;
+    cout << sah.length << endl;
+    cout << sah.attrLength << endl;
+
+    FileName fn;
+    fread(&fn, sizeof(fn), 1, fp);
+
+    convertFileTimeToDateTime(fn.fileCreated);
+    convertFileTimeToDateTime(fn.fileModified);
+    convertFileTimeToDateTime(fn.MFTChanged);
+    convertFileTimeToDateTime(fn.lastAccessTime);
+    cout << fn.fileAttributes << endl;
+    cout << fn.reparse << endl;
+    cout << (int)fn.fileNameLength << endl;
+    cout << (int)fn.fileNameFormat << endl;
+    cout << fn.fileName << endl;
+
+    fclose(fp);
+}
+
 int main(int argc, char **argv)
 {
     long startCluster = 786432;
@@ -170,8 +211,8 @@ int main(int argc, char **argv)
 
     // getBootSector();
     // getMFTEntry(startCluster, sectorPerCluster);
-    // readStandardInformation();
-
+    readStandardInformation();
+    readFileName();
 
     return 0;
 }
