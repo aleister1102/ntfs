@@ -2,15 +2,19 @@
 
 #include <cstdint>
 #include <iostream>
+#include <sstream>
 #include <stdio.h>
+#include <string>
 #include <windows.h>
 using namespace std;
 
 LPCWSTR INPUT_DRIVE = L"\\\\.\\U:";
-int DEFAULT_ENTRIES = 16;
+const char *ENTRY_FILENAME = "entry.bin";
 long long START_CLUSTER = 786432;
 long SECTOR_PER_CLUSTER = 8;
 long SECTOR_SIZE = 512;
+int STANDARD_INFORMATION_OFFSET = 56;
+int FILE_NAME_OFFSET = 152;
 
 struct StandardAttributeHeader
 {
@@ -49,7 +53,6 @@ struct FileName
     uint32_t reparse;
     uint8_t fileNameLength;
     uint8_t fileNameFormat;
-    char fileName[14];
 };
 
 struct DataHeader
@@ -70,5 +73,4 @@ struct DataHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
-
-void printFileName(char fileName[]);
+void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength);

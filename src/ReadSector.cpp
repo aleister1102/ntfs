@@ -65,15 +65,15 @@ void getNthEntry(BYTE entry[1024], int entryOffset = 0)
 
 void writeEntryToFile(BYTE entry[1024])
 {
-    FILE *fp = fopen("entry.bin", "wb");
+    FILE *fp = fopen(ENTRY_FILENAME, "wb");
     fwrite(entry, 1, 1024, fp);
     fclose(fp);
 }
 
 void readStandardInformation()
 {
-    FILE *fp = fopen("MFT.bin", "rb");
-    fseek(fp, 56, SEEK_SET);
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    fseek(fp, FILE_NAME_OFFSET, SEEK_SET);
 
     StandardAttributeHeader sah;
     fread(&sah, sizeof(sah), 1, fp);
@@ -96,15 +96,15 @@ void readStandardInformation()
 
 void readFileNameAttribute()
 {
-    FILE *fp = fopen("MFT.bin", "rb");
-    fseek(fp, 152, SEEK_SET);
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    fseek(fp, FILE_NAME_OFFSET, SEEK_SET);
 
     StandardAttributeHeader sah;
     fread(&sah, sizeof(sah), 1, fp);
 
-    cout << sah.signature << endl;
-    cout << sah.length << endl;
-    cout << sah.attrLength << endl;
+    cout << "Signature: " << sah.signature << endl;
+    cout << "Total length: " << sah.length << endl;
+    cout << "Attribute length:" << sah.attrLength << endl;
 
     FileName fn;
     fread(&fn, sizeof(fn), 1, fp);
@@ -117,16 +117,20 @@ void readFileNameAttribute()
     cout << fn.reparse << endl;
     cout << (int)fn.fileNameLength << endl;
     cout << (int)fn.fileNameFormat << endl;
-    printFileName(fn.fileName);
+
+    fseek(fp, 242, SEEK_SET);
+    uint16_t fileName[100];
+    readFileName(fp, fileName, (int)fn.fileNameLength);
 
     fclose(fp);
 }
 
-void printFileName(char fileName[])
+void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
 {
-    for (int i = 0; i < 14; i += 2)
+    for (int i = 0; i < fileNameLength; i++)
     {
-        cout << fileName[i] << fileName[i + 1];
+        fread(&fileName[i], 2, 1, fp);
+        cout << char(fileName[i]);
     }
 }
 
@@ -146,8 +150,9 @@ void readDataAttribute()
 int main(int argc, char **argv)
 {
     BYTE MFT[1024];
-    getNthEntry(MFT, 1);
+    getNthEntry(MFT);
     writeEntryToFile(MFT);
+    readFileNameAttribute();
 
     return 0;
 }
