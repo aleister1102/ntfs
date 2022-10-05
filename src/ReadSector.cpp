@@ -1,10 +1,17 @@
 #define UNICODE
 
+#include <cstdint>
 #include <iostream>
 #include <stdio.h>
 #include <windows.h>
 using namespace std;
+
 LPCWSTR INPUT_DRIVE = L"\\\\.\\U:";
+
+uint16_t swap_uint16(uint16_t val);
+uint32_t swap_uint32(uint32_t val);
+uint64_t swap_uint64(uint64_t val);
+SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime);
 
 int ReadSector(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE sector[512])
 {
@@ -54,38 +61,117 @@ void getBootSector()
     writeSectorToFile(sector, "boot_sector.bin");
 }
 
-void getMFTEntry(__int64 startCluster, __int64 sectorPerCluster)
+void getMFTEntry(int64_t startCluster, int64_t sectorPerCluster)
 {
     BYTE sector[512];
     LARGE_INTEGER li;
 
-    __int64 startSector = 512 * startCluster * sectorPerCluster;
+    int64_t startSector = 512 * startCluster * sectorPerCluster;
     li.QuadPart = startSector;
 
     ReadSector(INPUT_DRIVE, li.LowPart, &li.HighPart, sector);
     writeSectorToFile(sector, "MFT.bin");
 }
 
-void readMFTEntry()
+struct StandardInformationHeader
+{
+    uint32_t signature;
+    uint32_t length;
+    uint8_t nonResidentFlag;
+    uint8_t nameLength;
+    uint16_t nameOffset;
+};
+
+struct StandardInformation
+{
+    uint64_t fileCreated;
+    uint64_t fileModified;
+    uint64_t recordChanged;
+    uint64_t lastAccessTime;
+    uint32_t filePermissions;
+};
+
+void readStandardInformation()
 {
     FILE *fp = fopen("MFT.bin", "rb");
-    char attributeSign[5];
 
-    fseek(fp, 42, SEEK_SET);
-    fread(&attributeSign, sizeof(attributeSign), 1, fp);
+    StandardInformationHeader sih;
+    fseek(fp, 56, SEEK_SET);
+    fread(&sih, sizeof(sih), 1, fp);
+
+    swap_uint32(sih.signature);
+    swap_uint32(sih.length);
+    swap_uint16(sih.nameOffset);
+    cout << sih.signature << endl;
+    cout << sih.length << endl;
+    cout << sih.nonResidentFlag << endl;
+    cout << sih.nameLength << endl;
+    cout << sih.nameOffset << endl;
+
+    StandardInformation si;
+    fseek(fp, 80, SEEK_SET);
+    fread(&si, sizeof(si), 1, fp);
+
+    swap_uint64(si.fileCreated);
+    swap_uint64(si.fileModified);
+    swap_uint64(si.recordChanged);
+    swap_uint64(si.lastAccessTime);
+    swap_uint32(si.filePermissions);
+    convertFileTimeToDateTime(si.fileCreated);
+    convertFileTimeToDateTime(si.fileModified);
+    convertFileTimeToDateTime(si.recordChanged);
+    convertFileTimeToDateTime(si.lastAccessTime);
+    cout << si.filePermissions << endl;
+
     fclose(fp);
+}
 
-    cout << attributeSign;
+SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
+{
+    const char *day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    const char *month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+
+    long long value = filetime;
+    FILETIME ft = {0};
+
+    ft.dwHighDateTime = (value & 0xffffffff00000000) >> 32;
+    ft.dwLowDateTime = value & 0xffffffff;
+
+    SYSTEMTIME sys = {0};
+    FileTimeToSystemTime(&ft, &sys);
+
+    cout << day[sys.wDayOfWeek] << "," << month[sys.wMonth - 1] << " " << sys.wDay << "," << sys.wYear << " " << sys.wHour << ":" << sys.wMinute << ":" << sys.wSecond << endl;
+
+    return sys;
+}
+
+uint16_t swap_uint16(uint16_t val)
+{
+    return (val << 8) | (val >> 8);
+}
+
+uint32_t swap_uint32(uint32_t val)
+{
+    val = ((val << 8) & 0xFF00FF00) | ((val >> 8) & 0xFF00FF);
+    return (val << 16) | (val >> 16);
+}
+
+uint64_t swap_uint64(uint64_t val)
+{
+    val = ((val << 8) & 0xFF00FF00FF00FF00ULL) | ((val >> 8) & 0x00FF00FF00FF00FFULL);
+    val = ((val << 16) & 0xFFFF0000FFFF0000ULL) | ((val >> 16) & 0x0000FFFF0000FFFFULL);
+    return (val << 32) | (val >> 32);
 }
 
 int main(int argc, char **argv)
 {
-    int startCluster = 786432;
-    int sectorPerCluster = 8;
+    long startCluster = 786432;
+    long sectorPerCluster = 8;
 
     // getBootSector();
     // getMFTEntry(startCluster, sectorPerCluster);
-    // readMFTEntry();
+    // readStandardInformation();
+
 
     return 0;
 }
