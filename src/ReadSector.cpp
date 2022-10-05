@@ -8,11 +8,8 @@ using namespace std;
 
 LPCWSTR INPUT_DRIVE = L"\\\\.\\U:";
 
-uint16_t swap_uint16(uint16_t val);
-uint32_t swap_uint32(uint32_t val);
-uint64_t swap_uint64(uint64_t val);
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime);
-unsigned int reverseBits(unsigned int num);
+void printFileName(char fileName[]);
 
 int ReadSector(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE sector[512])
 {
@@ -106,7 +103,6 @@ void readStandardInformation()
     StandardAttributeHeader sah;
     fread(&sah, sizeof(sah), 1, fp);
 
-    // # cần lấy thông tin nào thì lật ngược bit rồi xuất ra.
     cout << sah.signature << endl;
     cout << sah.length << endl;
     cout << sah.attrLength << endl;
@@ -155,10 +151,10 @@ struct FileName
     uint32_t reparse;
     uint8_t fileNameLength;
     uint8_t fileNameFormat;
-    uint64_t fileName;
+    char fileName[14];
 };
 
-void readFileName()
+void readFileNameAttribute()
 {
     FILE *fp = fopen("MFT.bin", "rb");
     fseek(fp, 152, SEEK_SET);
@@ -181,9 +177,49 @@ void readFileName()
     cout << fn.reparse << endl;
     cout << (int)fn.fileNameLength << endl;
     cout << (int)fn.fileNameFormat << endl;
-    cout << fn.fileName << endl;
+    printFileName(fn.fileName);
 
     fclose(fp);
+}
+
+void printFileName(char fileName[])
+{
+    for (int i = 0; i < 14; i += 2)
+    {
+        cout << fileName[i] << fileName[i + 1];
+    }
+}
+
+struct DataHeader
+{
+    uint32_t signature;
+    uint32_t length;
+    uint8_t nonResidentFlag;
+    uint8_t nameLength;
+    uint16_t nameOffset;
+    uint16_t flags;
+    uint16_t attrID;
+    uint64_t firstVCN;
+    uint64_t lastVCN;
+    uint16_t dataRunsOffset;
+    uint16_t compressionUnitSize;
+    uint32_t padding;
+    uint64_t allocatedSize;
+    uint64_t realSize;
+    uint64_t initializedSize;
+};
+
+void readDataAttribute()
+{
+    FILE *fp = fopen("MFT.bin", "rb");
+    fseek(fp, 256, SEEK_SET);
+
+    StandardAttributeHeader dah;
+    fread(&dah, sizeof(dah), 1, fp);
+
+    cout << dah.signature << endl;
+    cout << dah.length << endl;
+    cout << (int)dah.nonResidentFlag << endl;
 }
 
 int main(int argc, char **argv)
@@ -193,8 +229,9 @@ int main(int argc, char **argv)
 
     // getBootSector();
     // getMFTEntry(startCluster, sectorPerCluster);
-    readStandardInformation();
-    readFileName();
+    // readStandardInformation();
+    // readFileNameAttribute();
+    // readDataAttribute();
 
     return 0;
 }
