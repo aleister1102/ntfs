@@ -1,17 +1,25 @@
-#define UNICODE
+#include "NTFS.h"
 
-#include <cstdint>
-#include <iostream>
-#include <stdio.h>
-#include <windows.h>
-using namespace std;
+static SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
+{
+    const char *day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    const char *month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
-LPCWSTR INPUT_DRIVE = L"\\\\.\\U:";
+    long long value = filetime;
+    FILETIME ft = {0};
 
-SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime);
-void printFileName(char fileName[]);
+    ft.dwHighDateTime = (value & 0xffffffff00000000) >> 32;
+    ft.dwLowDateTime = value & 0xffffffff;
 
-int ReadSector(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE sector[512])
+    SYSTEMTIME sys = {0};
+    FileTimeToSystemTime(&ft, &sys);
+
+    cout << day[sys.wDayOfWeek] << "," << month[sys.wMonth - 1] << " " << sys.wDay << "," << sys.wYear << " " << sys.wHour << ":" << sys.wMinute << ":" << sys.wSecond << endl;
+
+    return sys;
+}
+
+int getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
     int retCode = 0;
     DWORD bytesRead;
@@ -33,7 +41,7 @@ int ReadSector(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, 
 
     SetFilePointer(device, lDistanceToMove, lpDistanceToMoveHigh, FILE_BEGIN); // Set a Point to Read
 
-    if (!ReadFile(device, sector, 512, &bytesRead, NULL))
+    if (!ReadFile(device, entry, 1024, &bytesRead, NULL))
     {
         printf("ReadFile: %u\n", GetLastError());
     }
@@ -43,57 +51,24 @@ int ReadSector(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, 
     }
 }
 
-void writeSectorToFile(BYTE sector[512], const char *sectorName)
+void getNthEntry(BYTE entry[1024], int entryOffset = 0)
 {
-    FILE *fp;
-    fp = fopen(sectorName, "wb");
-    fwrite(sector, 1, 512, fp);
-    fclose(fp);
-}
-
-void getBootSector()
-{
-    BYTE sector[512];
-
-    ReadSector(INPUT_DRIVE, 0, 0, sector);
-    writeSectorToFile(sector, "boot_sector.bin");
-}
-
-void getMFTEntry(int64_t startCluster, int64_t sectorPerCluster)
-{
-    BYTE sector[512];
     LARGE_INTEGER li;
 
-    int64_t startSector = 512 * startCluster * sectorPerCluster;
-    li.QuadPart = startSector;
+    uint64_t startSector = START_CLUSTER * SECTOR_PER_CLUSTER * SECTOR_SIZE;
+    uint64_t bypassSector = entryOffset * 2 * SECTOR_SIZE;
+    uint64_t readSector = startSector + bypassSector;
+    li.QuadPart = readSector;
 
-    ReadSector(INPUT_DRIVE, li.LowPart, &li.HighPart, sector);
-    writeSectorToFile(sector, "MFT.bin");
+    getEntry(INPUT_DRIVE, li.LowPart, &li.HighPart, entry);
 }
 
-struct StandardAttributeHeader
+void writeEntryToFile(BYTE entry[1024])
 {
-    uint32_t signature;
-    uint32_t length;
-    uint8_t nonResidentFlag;
-    uint8_t nameLength;
-    uint16_t nameOffset;
-    uint16_t flags;
-    uint16_t attrID;
-    uint32_t attrLength;
-    uint16_t offsetToAttrData;
-    uint8_t indexFlag;
-    uint8_t padding;
-};
-
-struct StandardInformation
-{
-    uint64_t fileCreated;
-    uint64_t fileModified;
-    uint64_t MFTChanged;
-    uint64_t lastAccessTime;
-    uint32_t filePermissions;
-};
+    FILE *fp = fopen("entry.bin", "wb");
+    fwrite(entry, 1, 1024, fp);
+    fclose(fp);
+}
 
 void readStandardInformation()
 {
@@ -118,41 +93,6 @@ void readStandardInformation()
 
     fclose(fp);
 }
-
-SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
-{
-    const char *day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-    const char *month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
-
-    long long value = filetime;
-    FILETIME ft = {0};
-
-    ft.dwHighDateTime = (value & 0xffffffff00000000) >> 32;
-    ft.dwLowDateTime = value & 0xffffffff;
-
-    SYSTEMTIME sys = {0};
-    FileTimeToSystemTime(&ft, &sys);
-
-    cout << day[sys.wDayOfWeek] << "," << month[sys.wMonth - 1] << " " << sys.wDay << "," << sys.wYear << " " << sys.wHour << ":" << sys.wMinute << ":" << sys.wSecond << endl;
-
-    return sys;
-}
-
-struct FileName
-{
-    uint64_t fileReferenceToParentDir;
-    uint64_t fileCreated;
-    uint64_t fileModified;
-    uint64_t MFTChanged;
-    uint64_t lastAccessTime;
-    uint64_t allocatedSize;
-    uint64_t realSize;
-    uint32_t fileAttributes;
-    uint32_t reparse;
-    uint8_t fileNameLength;
-    uint8_t fileNameFormat;
-    char fileName[14];
-};
 
 void readFileNameAttribute()
 {
@@ -190,25 +130,6 @@ void printFileName(char fileName[])
     }
 }
 
-struct DataHeader
-{
-    uint32_t signature;
-    uint32_t length;
-    uint8_t nonResidentFlag;
-    uint8_t nameLength;
-    uint16_t nameOffset;
-    uint16_t flags;
-    uint16_t attrID;
-    uint64_t firstVCN;
-    uint64_t lastVCN;
-    uint16_t dataRunsOffset;
-    uint16_t compressionUnitSize;
-    uint32_t padding;
-    uint64_t allocatedSize;
-    uint64_t realSize;
-    uint64_t initializedSize;
-};
-
 void readDataAttribute()
 {
     FILE *fp = fopen("MFT.bin", "rb");
@@ -224,14 +145,9 @@ void readDataAttribute()
 
 int main(int argc, char **argv)
 {
-    long startCluster = 786432;
-    long sectorPerCluster = 8;
-
-    // getBootSector();
-    // getMFTEntry(startCluster, sectorPerCluster);
-    // readStandardInformation();
-    // readFileNameAttribute();
-    // readDataAttribute();
+    BYTE MFT[1024];
+    getNthEntry(MFT, 1);
+    writeEntryToFile(MFT);
 
     return 0;
 }
