@@ -74,9 +74,9 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void getSystemEntries()
+void getEntries(int quantity)
 {
-    for (int i = 0; i < 16; i++)
+    for (int i = 0; i < quantity; i++)
     {
         BYTE entry[1024];
         getNthEntry(entry, i);
@@ -85,6 +85,7 @@ void getSystemEntries()
         cout << "entry " << i << ": ";
         int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
         nextAttrOffset = readFileNameAttribute(nextAttrOffset);
+        cout << endl;
     }
 }
 
@@ -148,8 +149,6 @@ void printFileName(uint16_t fileName[], int fileNameLength)
 {
     for (int i = 0; i < fileNameLength; i++)
         cout << (char)fileName[i];
-
-    cout << endl;
 }
 
 void readDataAttribute(int attrOffset)
@@ -168,7 +167,7 @@ int main(int argc, char **argv)
 
 // Đọc nhiều entry
 #if 1
-    getSystemEntries();
+    getEntries(100);
 #endif
 
 // Đọc entry thứ n
