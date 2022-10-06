@@ -97,6 +97,7 @@ void readEntryHeader()
     fread(&EH, sizeof(EH), 1, fp);
 
     checkEntryFlags(EH.flags);
+    cout << "ID: " << EH.ID << endl;
 
     fclose(fp);
 }
@@ -147,6 +148,7 @@ int readFileNameAttribute(int currentOffset)
     FileName FN;
     fread(&FN, sizeof(FN), 1, fp);
 
+    printParentID(FN.parentID);
     // printDateTime(convertFileTimeToDateTime(FN.fileCreated), "File created time");
     // printDateTime(convertFileTimeToDateTime(FN.fileModified), "File modified time");
     // printDateTime(convertFileTimeToDateTime(FN.MFTChanged), "MFT changed time");
@@ -156,8 +158,7 @@ int readFileNameAttribute(int currentOffset)
     // cout << "File name format: " << (int)FN.fileNameFormat << endl;
 
     uint16_t fileName[100];
-    readFileName(fp, fileName, (int)FN.fileNameLength);
-    printFileName(fileName, (int)FN.fileNameLength);
+    printFileName(fp, fileName, (int)FN.fileNameLength);
 
     fclose(fp);
 
@@ -165,17 +166,21 @@ int readFileNameAttribute(int currentOffset)
     return nextOffset;
 }
 
-void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
+void printParentID(char parentID[6])
 {
-    for (int i = 0; i < fileNameLength; i++)
-        fread(&fileName[i], 2, 1, fp);
+    uint64_t buffer;
+    memcpy(&buffer, parentID, 6);
+    cout << "Parent ID: " << buffer << endl;
 }
 
-void printFileName(uint16_t fileName[], int fileNameLength)
+void printFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
 {
     cout << "Name: ";
     for (int i = 0; i < fileNameLength; i++)
+    {
+        fread(&fileName[i], 2, 1, fp);
         cout << (char)fileName[i];
+    }
 }
 
 void readDataAttribute(int currOffset)
@@ -200,7 +205,7 @@ int main(int argc, char **argv)
 // Đọc entry thứ n
 #if 0
     BYTE entry[1024];
-    readNthEntry(entry, 5);
+    readNthEntry(entry, 1);
     writeEntryToFile(entry);
     readEntryHeader();
     int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);

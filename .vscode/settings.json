@@ -14,6 +14,7 @@
         "streambuf": "cpp",
         "xlocmon": "cpp",
         "xutility": "cpp",
-        "xiosbase": "cpp"
+        "xiosbase": "cpp",
+        "cstdint": "cpp"
     }
 }

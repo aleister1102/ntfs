@@ -28,6 +28,12 @@ struct EntryHeader
     uint16_t hardLinkCount;
     uint16_t offsetToFirstAttr;
     uint16_t flags;
+    uint32_t realSizeOfFileRecord;
+    uint32_t allocatedSizeOfFileRecord;
+    uint64_t baseFileRecord;
+    uint16_t nextAttrID;
+    uint16_t unused;
+    uint32_t ID;
 };
 
 struct StandardAttributeHeader
@@ -47,7 +53,8 @@ struct StandardAttributeHeader
 
 struct FileName
 {
-    uint64_t fileReferenceToParentDir;
+    char parentID[6];
+    char parentSeqNum[2];
     uint64_t fileCreated;
     uint64_t fileModified;
     uint64_t MFTChanged;
@@ -82,5 +89,5 @@ void readEntryHeader();
 void checkEntryFlags(uint16_t flags);
 int readStandardInformation(int attrOffset);
 int readFileNameAttribute(int attrOffset);
-void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength);
-void printFileName(uint16_t fileName[], int fileNameLength);
+void printFileName(FILE *fp, uint16_t fileName[], int fileNameLength);
+void printParentID(char parentID[6]);
