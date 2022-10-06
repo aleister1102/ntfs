@@ -1,4 +1,4 @@
-#include "NTFS.h"
+#include "MTF.h"
 
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {
@@ -23,7 +23,7 @@ void printDateTime(SYSTEMTIME datetime, string prefix = "")
     cout << prefix << ": " << day[datetime.wDayOfWeek] << "," << month[datetime.wMonth - 1] << " " << datetime.wDay << "," << datetime.wYear << " " << datetime.wHour << ":" << datetime.wMinute << ":" << datetime.wSecond << endl;
 }
 
-int getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
+void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
     int retCode = 0;
     DWORD bytesRead;
@@ -40,7 +40,7 @@ int getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BY
     if (device == INVALID_HANDLE_VALUE) // Open Error
     {
         printf("CreateFile: %u\n", GetLastError());
-        return 1;
+        return;
     }
 
     SetFilePointer(device, lDistanceToMove, lpDistanceToMoveHigh, FILE_BEGIN); // Set a Point to Read
@@ -84,13 +84,13 @@ void showEntries(int quantity)
 
         cout << "entry " << i << ": ";
         readEntryHeader();
-        int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
-        nextAttrOffset = readFileNameAttribute(nextAttrOffset);
+        int currAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
+        currAttrOffset = readFileNameAttribute(currAttrOffset);
         cout << endl;
     }
 }
 
-int readEntryHeader()
+void readEntryHeader()
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     EntryHeader EH;
@@ -115,24 +115,24 @@ void checkEntryFlags(uint16_t flags)
     cout << result << endl;
 }
 
-int readStandardInformation(int attrOffset)
+int readStandardInformation(int currentOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, attrOffset, SEEK_SET);
+    fseek(fp, currentOffset, SEEK_SET);
 
     StandardAttributeHeader SAH;
     fread(&SAH, sizeof(SAH), 1, fp);
 
     fclose(fp);
 
-    int nextAttrOffset = attrOffset + SAH.totalLength;
-    return nextAttrOffset;
+    int nextOffset = currentOffset + SAH.totalLength;
+    return nextOffset;
 }
 
-int readFileNameAttribute(int attrOffset)
+int readFileNameAttribute(int currentOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, attrOffset, SEEK_SET);
+    fseek(fp, currentOffset, SEEK_SET);
 
     StandardAttributeHeader SAH;
     fread(&SAH, sizeof(SAH), 1, fp);
@@ -142,7 +142,7 @@ int readFileNameAttribute(int attrOffset)
     // cout << "Attribute data length: " << SAH.attrDataLength << endl;
 
     if (SAH.attributeType != 48)
-        return attrOffset + SAH.totalLength;
+        return currentOffset + SAH.totalLength;
 
     FileName FN;
     fread(&FN, sizeof(FN), 1, fp);
@@ -161,8 +161,8 @@ int readFileNameAttribute(int attrOffset)
 
     fclose(fp);
 
-    int nextAttrOffset = attrOffset + SAH.totalLength;
-    return nextAttrOffset;
+    int nextOffset = currentOffset + SAH.totalLength;
+    return nextOffset;
 }
 
 void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
@@ -178,10 +178,10 @@ void printFileName(uint16_t fileName[], int fileNameLength)
         cout << (char)fileName[i];
 }
 
-void readDataAttribute(int attrOffset)
+void readDataAttribute(int currOffset)
 {
     FILE *fp = fopen("MFT.bin", "rb");
-    fseek(fp, attrOffset, SEEK_SET);
+    fseek(fp, currOffset, SEEK_SET);
 
     DataHeader DAH;
     fread(&DAH, sizeof(DAH), 1, fp);

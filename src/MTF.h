@@ -10,7 +10,7 @@
 #include <windows.h>
 using namespace std;
 
-LPCWSTR INPUT_DRIVE = L"\\\\.\\U:";
+LPCWSTR INPUT_DRIVE = L"\\\\.\\D:";
 const char *ENTRY_FILENAME = "entry.bin";
 long long START_CLUSTER = 786432;
 long SECTOR_PER_CLUSTER = 8;
@@ -78,7 +78,7 @@ struct DataHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
-int readEntryHeader();
+void readEntryHeader();
 void checkEntryFlags(uint16_t flags);
 int readStandardInformation(int attrOffset);
 int readFileNameAttribute(int attrOffset);
