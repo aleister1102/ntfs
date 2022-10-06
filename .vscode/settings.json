@@ -13,6 +13,7 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "xlocmon": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "xiosbase": "cpp"
     }
 }

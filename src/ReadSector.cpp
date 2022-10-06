@@ -55,7 +55,7 @@ int getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BY
     }
 }
 
-void getNthEntry(BYTE entry[1024], int entryOffset = 0)
+void readNthEntry(BYTE entry[1024], int entryOffset = 0)
 {
     LARGE_INTEGER li;
 
@@ -74,19 +74,45 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void getEntries(int quantity)
+void showEntries(int quantity)
 {
     for (int i = 0; i < quantity; i++)
     {
         BYTE entry[1024];
-        getNthEntry(entry, i);
+        readNthEntry(entry, i);
         writeEntryToFile(entry);
 
         cout << "entry " << i << ": ";
+        readEntryHeader();
         int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
         nextAttrOffset = readFileNameAttribute(nextAttrOffset);
         cout << endl;
     }
+}
+
+int readEntryHeader()
+{
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    EntryHeader EH;
+    fread(&EH, sizeof(EH), 1, fp);
+
+    checkEntryFlags(EH.flags);
+
+    fclose(fp);
+}
+
+void checkEntryFlags(uint16_t flags)
+{
+    // Bit 0: trạng thái sử dụng
+    int isUsed = flags & 1;
+    // Bit 1: loại entry (tập tin hoặc thư mục)
+    flags = flags >> 1;
+    int isDir = flags & 1;
+
+    string result = isDir ? "Directory " : "File ";
+    result += isUsed ? "is being used" : "";
+
+    cout << result << endl;
 }
 
 int readStandardInformation(int attrOffset)
@@ -94,12 +120,12 @@ int readStandardInformation(int attrOffset)
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     fseek(fp, attrOffset, SEEK_SET);
 
-    StandardAttributeHeader sah;
-    fread(&sah, sizeof(sah), 1, fp);
+    StandardAttributeHeader SAH;
+    fread(&SAH, sizeof(SAH), 1, fp);
 
     fclose(fp);
 
-    int nextAttrOffset = attrOffset + sah.totalLength;
+    int nextAttrOffset = attrOffset + SAH.totalLength;
     return nextAttrOffset;
 }
 
@@ -108,34 +134,34 @@ int readFileNameAttribute(int attrOffset)
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     fseek(fp, attrOffset, SEEK_SET);
 
-    StandardAttributeHeader sah;
-    fread(&sah, sizeof(sah), 1, fp);
+    StandardAttributeHeader SAH;
+    fread(&SAH, sizeof(SAH), 1, fp);
 
-    // cout << "Attribute type: " << sah.attributeType << endl;
-    // cout << "Attribute total length: " << sah.totalLength << endl;
-    // cout << "Attribute data length: " << sah.attrDataLength << endl;
+    // cout << "Attribute type: " << SAH.attributeType << endl;
+    // cout << "Attribute total length: " << SAH.totalLength << endl;
+    // cout << "Attribute data length: " << SAH.attrDataLength << endl;
 
-    if (sah.attributeType != 48)
-        return attrOffset + sah.totalLength;
+    if (SAH.attributeType != 48)
+        return attrOffset + SAH.totalLength;
 
-    FileName fn;
-    fread(&fn, sizeof(fn), 1, fp);
+    FileName FN;
+    fread(&FN, sizeof(FN), 1, fp);
 
-    // printDateTime(convertFileTimeToDateTime(fn.fileCreated), "File created time");
-    // printDateTime(convertFileTimeToDateTime(fn.fileModified), "File modified time");
-    // printDateTime(convertFileTimeToDateTime(fn.MFTChanged), "MFT changed time");
-    // printDateTime(convertFileTimeToDateTime(fn.lastAccess), "Last access time");
-    // cout << "File permissions: " << fn.fileAttributes << endl;
-    // cout << "File name length: " << (int)fn.fileNameLength << endl;
-    // cout << "File name format: " << (int)fn.fileNameFormat << endl;
+    // printDateTime(convertFileTimeToDateTime(FN.fileCreated), "File created time");
+    // printDateTime(convertFileTimeToDateTime(FN.fileModified), "File modified time");
+    // printDateTime(convertFileTimeToDateTime(FN.MFTChanged), "MFT changed time");
+    // printDateTime(convertFileTimeToDateTime(FN.lastAccess), "Last access time");
+    // cout << "File permissions: " << FN.fileAttributes << endl;
+    // cout << "File name length: " << (int)FN.fileNameLength << endl;
+    // cout << "File name format: " << (int)FN.fileNameFormat << endl;
 
     uint16_t fileName[100];
-    readFileName(fp, fileName, (int)fn.fileNameLength);
-    printFileName(fileName, (int)fn.fileNameLength);
+    readFileName(fp, fileName, (int)FN.fileNameLength);
+    printFileName(fileName, (int)FN.fileNameLength);
 
     fclose(fp);
 
-    int nextAttrOffset = attrOffset + sah.totalLength;
+    int nextAttrOffset = attrOffset + SAH.totalLength;
     return nextAttrOffset;
 }
 
@@ -147,6 +173,7 @@ void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
 
 void printFileName(uint16_t fileName[], int fileNameLength)
 {
+    cout << "Name: ";
     for (int i = 0; i < fileNameLength; i++)
         cout << (char)fileName[i];
 }
@@ -156,8 +183,8 @@ void readDataAttribute(int attrOffset)
     FILE *fp = fopen("MFT.bin", "rb");
     fseek(fp, attrOffset, SEEK_SET);
 
-    DataHeader dah;
-    fread(&dah, sizeof(dah), 1, fp);
+    DataHeader DAH;
+    fread(&DAH, sizeof(DAH), 1, fp);
 
     fclose(fp);
 }
@@ -167,14 +194,15 @@ int main(int argc, char **argv)
 
 // Đọc nhiều entry
 #if 1
-    getEntries(100);
+    showEntries(40);
 #endif
 
 // Đọc entry thứ n
 #if 0
     BYTE entry[1024];
-    getNthEntry(entry, 12);
+    readNthEntry(entry, 5);
     writeEntryToFile(entry);
+    readEntryHeader();
     int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
     nextAttrOffset = readFileNameAttribute(nextAttrOffset);
 #endif

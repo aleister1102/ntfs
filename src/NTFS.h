@@ -25,6 +25,9 @@ struct EntryHeader
     uint16_t updateSeqSize;
     uint64_t logFileSeqNum;
     uint16_t seqNum;
+    uint16_t hardLinkCount;
+    uint16_t offsetToFirstAttr;
+    uint16_t flags;
 };
 
 struct StandardAttributeHeader
@@ -75,6 +78,8 @@ struct DataHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
+int readEntryHeader();
+void checkEntryFlags(uint16_t flags);
 int readStandardInformation(int attrOffset);
 int readFileNameAttribute(int attrOffset);
 void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength);
