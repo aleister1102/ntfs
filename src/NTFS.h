@@ -1,4 +1,6 @@
 #define UNICODE
+// Yêu cầu compiler cấp phát bộ nhớ đúng với kdl (không padding)
+#pragma pack(1)
 
 #include <cstdint>
 #include <iostream>
@@ -14,30 +16,30 @@ long long START_CLUSTER = 786432;
 long SECTOR_PER_CLUSTER = 8;
 long SECTOR_SIZE = 512;
 int STANDARD_INFORMATION_OFFSET = 56;
-int FILE_NAME_OFFSET = 152;
+int FILE_NAME_OFFSET = 128;
+
+struct EntryHeader
+{
+    uint32_t signature;
+    uint16_t offsetToUpdateSeq;
+    uint16_t updateSeqSize;
+    uint64_t logFileSeqNum;
+    uint16_t seqNum;
+};
 
 struct StandardAttributeHeader
 {
-    uint32_t signature;
-    uint32_t length;
+    uint32_t attributeType;
+    uint32_t totalLength;
     uint8_t nonResidentFlag;
     uint8_t nameLength;
     uint16_t nameOffset;
     uint16_t flags;
     uint16_t attrID;
-    uint32_t attrLength;
+    uint32_t attrDataLength;
     uint16_t offsetToAttrData;
     uint8_t indexFlag;
     uint8_t padding;
-};
-
-struct StandardInformation
-{
-    uint64_t fileCreated;
-    uint64_t fileModified;
-    uint64_t MFTChanged;
-    uint64_t lastAccessTime;
-    uint32_t filePermissions;
 };
 
 struct FileName
@@ -46,7 +48,7 @@ struct FileName
     uint64_t fileCreated;
     uint64_t fileModified;
     uint64_t MFTChanged;
-    uint64_t lastAccessTime;
+    uint64_t lastAccess;
     uint64_t allocatedSize;
     uint64_t realSize;
     uint32_t fileAttributes;
@@ -57,7 +59,7 @@ struct FileName
 
 struct DataHeader
 {
-    uint32_t signature;
+    uint32_t attributeType;
     uint32_t length;
     uint8_t nonResidentFlag;
     uint8_t nameLength;
@@ -73,4 +75,7 @@ struct DataHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
+int readStandardInformation(int attrOffset);
+int readFileNameAttribute(int attrOffset);
 void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength);
+void printFileName(uint16_t fileName[], int fileNameLength);

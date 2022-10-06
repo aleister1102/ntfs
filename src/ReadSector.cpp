@@ -1,9 +1,7 @@
 #include "NTFS.h"
 
-static SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
+SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {
-    const char *day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-    const char *month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
     long long value = filetime;
     FILETIME ft = {0};
@@ -14,9 +12,15 @@ static SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
     SYSTEMTIME sys = {0};
     FileTimeToSystemTime(&ft, &sys);
 
-    cout << day[sys.wDayOfWeek] << "," << month[sys.wMonth - 1] << " " << sys.wDay << "," << sys.wYear << " " << sys.wHour << ":" << sys.wMinute << ":" << sys.wSecond << endl;
-
     return sys;
+}
+
+void printDateTime(SYSTEMTIME datetime, string prefix = "")
+{
+    string day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    string month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+
+    cout << prefix << ": " << day[datetime.wDayOfWeek] << "," << month[datetime.wMonth - 1] << " " << datetime.wDay << "," << datetime.wYear << " " << datetime.wHour << ":" << datetime.wMinute << ":" << datetime.wSecond << endl;
 }
 
 int getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
@@ -47,7 +51,7 @@ int getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BY
     }
     else
     {
-        printf("Success!\n");
+        // printf("Success!\n");
     }
 }
 
@@ -70,89 +74,111 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void readStandardInformation()
+void getSystemEntries()
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, FILE_NAME_OFFSET, SEEK_SET);
+    for (int i = 0; i < 16; i++)
+    {
+        BYTE entry[1024];
+        getNthEntry(entry, i);
+        writeEntryToFile(entry);
 
-    StandardAttributeHeader sah;
-    fread(&sah, sizeof(sah), 1, fp);
-
-    cout << sah.signature << endl;
-    cout << sah.length << endl;
-    cout << sah.attrLength << endl;
-
-    StandardInformation si;
-    fread(&si, sizeof(si), 1, fp);
-
-    convertFileTimeToDateTime(si.fileCreated);
-    convertFileTimeToDateTime(si.fileModified);
-    convertFileTimeToDateTime(si.MFTChanged);
-    convertFileTimeToDateTime(si.lastAccessTime);
-    cout << si.filePermissions << endl;
-
-    fclose(fp);
+        cout << "entry " << i << ": ";
+        int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
+        nextAttrOffset = readFileNameAttribute(nextAttrOffset);
+    }
 }
 
-void readFileNameAttribute()
+int readStandardInformation(int attrOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, FILE_NAME_OFFSET, SEEK_SET);
+    fseek(fp, attrOffset, SEEK_SET);
 
     StandardAttributeHeader sah;
     fread(&sah, sizeof(sah), 1, fp);
 
-    cout << "Signature: " << sah.signature << endl;
-    cout << "Total length: " << sah.length << endl;
-    cout << "Attribute length:" << sah.attrLength << endl;
+    fclose(fp);
+
+    int nextAttrOffset = attrOffset + sah.totalLength;
+    return nextAttrOffset;
+}
+
+int readFileNameAttribute(int attrOffset)
+{
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    fseek(fp, attrOffset, SEEK_SET);
+
+    StandardAttributeHeader sah;
+    fread(&sah, sizeof(sah), 1, fp);
+
+    // cout << "Attribute type: " << sah.attributeType << endl;
+    // cout << "Attribute total length: " << sah.totalLength << endl;
+    // cout << "Attribute data length: " << sah.attrDataLength << endl;
+
+    if (sah.attributeType != 48)
+        return attrOffset + sah.totalLength;
 
     FileName fn;
     fread(&fn, sizeof(fn), 1, fp);
 
-    convertFileTimeToDateTime(fn.fileCreated);
-    convertFileTimeToDateTime(fn.fileModified);
-    convertFileTimeToDateTime(fn.MFTChanged);
-    convertFileTimeToDateTime(fn.lastAccessTime);
-    cout << fn.fileAttributes << endl;
-    cout << fn.reparse << endl;
-    cout << (int)fn.fileNameLength << endl;
-    cout << (int)fn.fileNameFormat << endl;
+    // printDateTime(convertFileTimeToDateTime(fn.fileCreated), "File created time");
+    // printDateTime(convertFileTimeToDateTime(fn.fileModified), "File modified time");
+    // printDateTime(convertFileTimeToDateTime(fn.MFTChanged), "MFT changed time");
+    // printDateTime(convertFileTimeToDateTime(fn.lastAccess), "Last access time");
+    // cout << "File permissions: " << fn.fileAttributes << endl;
+    // cout << "File name length: " << (int)fn.fileNameLength << endl;
+    // cout << "File name format: " << (int)fn.fileNameFormat << endl;
 
-    fseek(fp, 242, SEEK_SET);
     uint16_t fileName[100];
     readFileName(fp, fileName, (int)fn.fileNameLength);
+    printFileName(fileName, (int)fn.fileNameLength);
 
     fclose(fp);
+
+    int nextAttrOffset = attrOffset + sah.totalLength;
+    return nextAttrOffset;
 }
 
 void readFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
 {
     for (int i = 0; i < fileNameLength; i++)
-    {
         fread(&fileName[i], 2, 1, fp);
-        cout << char(fileName[i]);
-    }
 }
 
-void readDataAttribute()
+void printFileName(uint16_t fileName[], int fileNameLength)
+{
+    for (int i = 0; i < fileNameLength; i++)
+        cout << (char)fileName[i];
+
+    cout << endl;
+}
+
+void readDataAttribute(int attrOffset)
 {
     FILE *fp = fopen("MFT.bin", "rb");
-    fseek(fp, 256, SEEK_SET);
+    fseek(fp, attrOffset, SEEK_SET);
 
-    StandardAttributeHeader dah;
+    DataHeader dah;
     fread(&dah, sizeof(dah), 1, fp);
 
-    cout << dah.signature << endl;
-    cout << dah.length << endl;
-    cout << (int)dah.nonResidentFlag << endl;
+    fclose(fp);
 }
 
 int main(int argc, char **argv)
 {
-    BYTE MFT[1024];
-    getNthEntry(MFT);
-    writeEntryToFile(MFT);
-    readFileNameAttribute();
+
+// Đọc nhiều entry
+#if 1
+    getSystemEntries();
+#endif
+
+// Đọc entry thứ n
+#if 0
+    BYTE entry[1024];
+    getNthEntry(entry, 12);
+    writeEntryToFile(entry);
+    int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
+    nextAttrOffset = readFileNameAttribute(nextAttrOffset);
+#endif
 
     return 0;
 }

@@ -5,6 +5,14 @@
         "vector": "cpp",
         "xlocale": "cpp",
         "xstring": "cpp",
-        "iosfwd": "cpp"
+        "iosfwd": "cpp",
+        "deque": "cpp",
+        "exception": "cpp",
+        "iomanip": "cpp",
+        "iterator": "cpp",
+        "stdexcept": "cpp",
+        "streambuf": "cpp",
+        "xlocmon": "cpp",
+        "xutility": "cpp"
     }
 }
