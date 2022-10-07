@@ -3,6 +3,7 @@
 EntryHeader EH;
 StandardAttributeHeader SAH;
 FileNameAttribute FN;
+uint16_t *fileName = nullptr;
 
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {
@@ -79,7 +80,7 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void showEntries(int quantity)
+void printEntries(int quantity)
 {
     for (int i = 0; i < quantity; i++)
     {
@@ -95,12 +96,47 @@ void showEntries(int quantity)
     }
 }
 
-void getCurrDirEntries(int parentID)
+void getCurrDirEntries(unsigned int currDirID)
 {
-    for (int i = 0; i < 1000; i++)
+    // Khi nào thì MFT kết thúc?
+    for (int i = 0; i < 100; i++)
     {
+        int isUsed;
+        int isDir;
+        unsigned int parentID;
+
         BYTE entry[1024];
         getNthEntry(entry, i);
+
+        int currentOffset = STANDARD_INFORMATION_OFFSET;
+        tuple<int, int> tp = readEntryHeader();
+        readStandardInformation(currentOffset);
+        readFileNameAttribute(currentOffset);
+        parentID = readParentID(FN.parentID);
+
+        if (parentID == currDirID && fileName)
+        {
+            if (!EH.ID && i > 0)
+                continue;
+
+            // Loại và trạng thái của entry
+            string result = get<1>(tp) ? "Directory " : "File ";
+            result += get<0>(tp) ? "is being used" : "";
+            cout << result << endl;
+
+            // ID của entry
+            cout << "ID: " << EH.ID << endl;
+
+            // parentID của entry
+            cout << "Parent ID: " << parentID << endl;
+
+            // Tên của entry
+            printFileName(FN.fileNameLength);
+
+            cout << "=================" << endl;
+        }
+
+        parentID = -1;
     }
 }
 
@@ -110,14 +146,6 @@ tuple<int, int> readEntryHeader()
     fread(&EH, sizeof(EH), 1, fp);
 
     tuple<int, int> tp = getEntryFlags(EH.flags);
-
-    // Xuất ra loại và trạng thái của entry
-    string result = get<1>(tp) ? "Directory " : "File ";
-    result += get<0>(tp) ? "is being used" : "";
-    cout << result << endl;
-
-    // Xuất ra ID của entry
-    cout << "ID: " << EH.ID << endl;
 
     fclose(fp);
     return tp;
@@ -159,7 +187,6 @@ void readFileNameAttribute(int &currentOffset)
 
     fread(&FN, sizeof(FN), 1, fp);
 
-    printParentID(FN.parentID);
     // printDateTime(convertFileTimeToDateTime(FN.fileCreated), "File created time");
     // printDateTime(convertFileTimeToDateTime(FN.fileModified), "File modified time");
     // printDateTime(convertFileTimeToDateTime(FN.MFTChanged), "MFT changed time");
@@ -168,29 +195,35 @@ void readFileNameAttribute(int &currentOffset)
     // cout << "File name length: " << (int)FN.fileNameLength << endl;
     // cout << "File name format: " << (int)FN.fileNameFormat << endl;
 
-    uint16_t fileName[100];
-    printFileName(fp, fileName, (int)FN.fileNameLength);
+    readFileName(fp, FN.fileNameLength);
 
     fclose(fp);
-
     currentOffset += SAH.totalLength;
 }
 
-void printParentID(char parentID[6])
+uint32_t readParentID(char parentID[6])
 {
-    uint64_t buffer;
+    uint32_t buffer;
     memcpy(&buffer, parentID, 6);
-    cout << "Parent ID: " << buffer << endl;
+    return buffer;
 }
 
-void printFileName(FILE *fp, uint16_t fileName[], int fileNameLength)
+void readFileName(FILE *fp, int fileNameLength)
+{
+    fileName = new uint16_t[100];
+    for (int i = 0; i < fileNameLength; i++)
+        fread(&fileName[i], 2, 1, fp);
+}
+
+void printFileName(int fileNameLength)
 {
     cout << "Name: ";
     for (int i = 0; i < fileNameLength; i++)
-    {
-        fread(&fileName[i], 2, 1, fp);
         cout << (char)fileName[i];
-    }
+    cout << endl;
+
+    delete[] fileName;
+    fileName = nullptr;
 }
 
 void readDataAttribute(int currOffset)
@@ -207,9 +240,9 @@ void readDataAttribute(int currOffset)
 int main(int argc, char **argv)
 {
 
-// Đọc nhiều entry
+// Đọc các entry của thư mục dựa trên ID
 #if 1
-    showEntries(40);
+    getCurrDirEntries(5);
 #endif
 
 // Đọc entry thứ n

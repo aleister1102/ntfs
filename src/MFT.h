@@ -91,5 +91,6 @@ tuple<int, int> readEntryHeader();
 tuple<int, int> getEntryFlags(uint16_t flags);
 void readStandardInformation(int &currentOffset);
 void readFileNameAttribute(int &currentOffset);
-void printFileName(FILE *fp, uint16_t fileName[], int fileNameLength);
-void printParentID(char parentID[6]);
+void readFileName(FILE *fp, int fileNameLength);
+void printFileName(int fileNameLength);
+unsigned int readParentID(char parentID[6]);
