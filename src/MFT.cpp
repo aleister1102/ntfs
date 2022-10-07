@@ -61,36 +61,6 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void printEntries(int quantity)
-{
-    for (int i = 0; i < quantity; i++)
-    {
-        BYTE entry[1024];
-        getNthEntry(entry, i);
-
-        int currOffset = STANDARD_INFORMATION_OFFSET;
-        unsigned int parentID;
-
-        readEntryHeader();
-        readStandardInformation(currOffset);
-        readFileNameAttribute(currOffset);
-        parentID = readParentID(FNA.parentID);
-
-        cout << "Entry " << i << endl;
-
-        // ID của entry
-        cout << "ID: " << EH.ID << endl;
-
-        // parentID của entry
-        cout << "Parent ID: " << parentID << endl;
-
-        // Tên của entry
-        printFileName(FNA.fileNameLength);
-
-        cout << "=================" << endl;
-    }
-}
-
 void listCurrDir(unsigned int currDirID = 5)
 {
     // Khi nào thì MFT kết thúc?
@@ -220,6 +190,7 @@ void readDataAttribute(int currOffset)
 
 void menu()
 {
+    int running = true;
     do
     {
         string DRIVE = convertWideCharToString(INPUT_DRIVE);
@@ -229,9 +200,9 @@ void menu()
         string COMMAND;
         getline(cin, COMMAND);
         vector<string> args = split(COMMAND);
-        handleCommands(args);
+        running = handleCommands(args);
 
-    } while (1);
+    } while (running);
 }
 
 string convertWideCharToString(const wchar_t *characters)
@@ -255,7 +226,7 @@ vector<string> split(const string &s, char delim)
     return result;
 }
 
-void handleCommands(vector<string> args)
+int handleCommands(vector<string> args)
 {
     if (args[0] == "cls")
         system("cls");
@@ -267,14 +238,18 @@ void handleCommands(vector<string> args)
         {
             if (DIR_STACK.back() != 5)
                 DIR_STACK.pop_back();
-            return;
+            return 1;
         }
 
         if (stoi(args[1]))
             DIR_STACK.push_back(stoi(args[1])); // cần kiểm soát lỗi
     }
+    else if (args[0] == "exit")
+        return 0;
     else
         cout << "Can not regconize " << args[0] << endl;
+
+    return 1;
 }
 
 int main(int argc, char **argv)

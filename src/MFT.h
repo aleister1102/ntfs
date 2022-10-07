@@ -99,7 +99,7 @@ void readFileName(FILE *fp, int fileNameLength);
 void printFileName(int fileNameLength);
 string convertWideCharToString(const wchar_t *characters);
 vector<string> split(const string &s, char delim = ' ');
-void handleCommands(vector<string> args);
+int handleCommands(vector<string> args);
 
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {
