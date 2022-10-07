@@ -4,10 +4,12 @@
 
 #include <cstdint>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <stdio.h>
 #include <string>
 #include <tuple>
+#include <vector>
 #include <windows.h>
 using namespace std;
 
@@ -96,7 +98,8 @@ unsigned int readParentID(char parentID[6]);
 void readFileName(FILE *fp, int fileNameLength);
 void printFileName(int fileNameLength);
 string convertWideCharToString(const wchar_t *characters);
-void handleCommands(string command);
+vector<string> split(const string &s, char delim = ' ');
+void handleCommands(vector<string> args);
 
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {

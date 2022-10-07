@@ -1,10 +1,13 @@
 #include "MFT.h"
 
-int CURRENT_DIR_ID = 5;
 EntryHeader EH;
 StandardAttributeHeader SAH;
 FileNameAttribute FNA;
 uint16_t *FILE_NAME = nullptr;
+
+int ROOT_DIR = 5;
+vector<int> DIR_STACK = {ROOT_DIR};
+string DIR_PATTERN = "[0-9]+";
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
@@ -220,12 +223,14 @@ void menu()
     do
     {
         string DRIVE = convertWideCharToString(INPUT_DRIVE);
-        cout << DRIVE << "\\" << CURRENT_DIR_ID << "\\"
+        cout << DRIVE << "\\" << DIR_STACK.back() << "\\"
              << ">";
 
         string COMMAND;
         getline(cin, COMMAND);
-        handleCommands(COMMAND);
+        vector<string> args = split(COMMAND);
+        handleCommands(args);
+
     } while (1);
 }
 
@@ -236,33 +241,44 @@ string convertWideCharToString(const wchar_t *characters)
     return str;
 }
 
-void handleCommands(string command)
+vector<string> split(const string &s, char delim)
 {
-    if (command == "cls")
+    vector<string> result;
+    stringstream ss(s);
+    string item;
+
+    while (getline(ss, item, delim))
+    {
+        result.push_back(item);
+    }
+
+    return result;
+}
+
+void handleCommands(vector<string> args)
+{
+    if (args[0] == "cls")
         system("cls");
-    if (command == "ls")
-        listCurrDir(CURRENT_DIR_ID);
+    else if (args[0] == "ls")
+        listCurrDir(DIR_STACK.back());
+    else if (args[0] == "cd")
+    {
+        if (args[1] == "..")
+        {
+            if (DIR_STACK.back() != 5)
+                DIR_STACK.pop_back();
+            return;
+        }
+
+        if (stoi(args[1]))
+            DIR_STACK.push_back(stoi(args[1])); // cần kiểm soát lỗi
+    }
     else
-        cout << "Can not regconize " << command << endl;
+        cout << "Can not regconize " << args[0] << endl;
 }
 
 int main(int argc, char **argv)
 {
-
-// Đọc các entry của thư mục dựa trên ID
-#if 0
-    listCurrDir();
-#endif
-
-// Đọc entry thứ n
-#if 0
-    BYTE entry[1024];
-    getNthEntry(entry, 1);
-    readEntryHeader();
-    int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
-    nextAttrOffset = readFileNameAttribute(nextAttrOffset);
-#endif
-
     menu();
 
     return 0;
