@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stdio.h>
 #include <string>
+#include <tuple>
 #include <windows.h>
 using namespace std;
 
@@ -85,8 +86,9 @@ struct DataHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
-void readEntryHeader();
-void checkEntryFlags(uint16_t flags);
+void writeEntryToFile(BYTE entry[1024]);
+tuple<int, int> readEntryHeader();
+tuple<int, int> getEntryFlags(uint16_t flags);
 void readStandardInformation(int &currentOffset);
 void readFileNameAttribute(int &currentOffset);
 void printFileName(FILE *fp, uint16_t fileName[], int fileNameLength);

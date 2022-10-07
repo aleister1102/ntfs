@@ -97,21 +97,33 @@ void showEntries(int quantity)
 
 void getCurrDirEntries(int parentID)
 {
-
+    for (int i = 0; i < 1000; i++)
+    {
+        BYTE entry[1024];
+        getNthEntry(entry, i);
+    }
 }
 
-void readEntryHeader()
+tuple<int, int> readEntryHeader()
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     fread(&EH, sizeof(EH), 1, fp);
 
-    checkEntryFlags(EH.flags);
+    tuple<int, int> tp = getEntryFlags(EH.flags);
+
+    // Xuất ra loại và trạng thái của entry
+    string result = get<1>(tp) ? "Directory " : "File ";
+    result += get<0>(tp) ? "is being used" : "";
+    cout << result << endl;
+
+    // Xuất ra ID của entry
     cout << "ID: " << EH.ID << endl;
 
     fclose(fp);
+    return tp;
 }
 
-void checkEntryFlags(uint16_t flags)
+tuple<int, int> getEntryFlags(uint16_t flags)
 {
     // Bit 0: trạng thái sử dụng
     int isUsed = flags & 1;
@@ -119,10 +131,7 @@ void checkEntryFlags(uint16_t flags)
     flags = flags >> 1;
     int isDir = flags & 1;
 
-    string result = isDir ? "Directory " : "File ";
-    result += isUsed ? "is being used" : "";
-
-    cout << result << endl;
+    return make_tuple(isUsed, isDir);
 }
 
 void readStandardInformation(int &currentOffset)
