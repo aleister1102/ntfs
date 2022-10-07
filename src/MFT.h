@@ -68,10 +68,10 @@ struct FileNameAttribute
     uint8_t fileNameFormat;
 };
 
-struct DataHeader
+struct DataAttributeHeader
 {
     uint32_t attributeType;
-    uint32_t length;
+    uint32_t totalLength;
     uint8_t nonResidentFlag;
     uint8_t nameLength;
     uint16_t nameOffset;
@@ -86,11 +86,37 @@ struct DataHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
+
 void writeEntryToFile(BYTE entry[1024]);
-tuple<int, int> readEntryHeader();
-tuple<int, int> getEntryFlags(uint16_t flags);
+void readEntryHeader();
+tuple<int, int> readEntryFlags(uint16_t flags);
 void readStandardInformation(int &currentOffset);
 void readFileNameAttribute(int &currentOffset);
+unsigned int readParentID(char parentID[6]);
 void readFileName(FILE *fp, int fileNameLength);
 void printFileName(int fileNameLength);
-unsigned int readParentID(char parentID[6]);
+string convertWideCharToString(const wchar_t *characters);
+void handleCommands(string command);
+
+SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
+{
+
+    long long value = filetime;
+    FILETIME ft = {0};
+
+    ft.dwHighDateTime = (value & 0xffffffff00000000) >> 32;
+    ft.dwLowDateTime = value & 0xffffffff;
+
+    SYSTEMTIME sys = {0};
+    FileTimeToSystemTime(&ft, &sys);
+
+    return sys;
+}
+
+void printDateTime(SYSTEMTIME datetime, string prefix = "")
+{
+    string day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    string month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+
+    cout << prefix << ": " << day[datetime.wDayOfWeek] << "," << month[datetime.wMonth - 1] << " " << datetime.wDay << "," << datetime.wYear << " " << datetime.wHour << ":" << datetime.wMinute << ":" << datetime.wSecond << endl;
+}

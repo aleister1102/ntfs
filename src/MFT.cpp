@@ -1,32 +1,10 @@
 #include "MFT.h"
 
+int CURRENT_DIR_ID = 5;
 EntryHeader EH;
 StandardAttributeHeader SAH;
-FileNameAttribute FN;
-uint16_t *fileName = nullptr;
-
-SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
-{
-
-    long long value = filetime;
-    FILETIME ft = {0};
-
-    ft.dwHighDateTime = (value & 0xffffffff00000000) >> 32;
-    ft.dwLowDateTime = value & 0xffffffff;
-
-    SYSTEMTIME sys = {0};
-    FileTimeToSystemTime(&ft, &sys);
-
-    return sys;
-}
-
-void printDateTime(SYSTEMTIME datetime, string prefix = "")
-{
-    string day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-    string month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
-
-    cout << prefix << ": " << day[datetime.wDayOfWeek] << "," << month[datetime.wMonth - 1] << " " << datetime.wDay << "," << datetime.wYear << " " << datetime.wHour << ":" << datetime.wMinute << ":" << datetime.wSecond << endl;
-}
+FileNameAttribute FNA;
+uint16_t *FILE_NAME = nullptr;
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
@@ -87,16 +65,30 @@ void printEntries(int quantity)
         BYTE entry[1024];
         getNthEntry(entry, i);
 
-        cout << "entry " << i << ": ";
         int currOffset = STANDARD_INFORMATION_OFFSET;
+        unsigned int parentID;
+
         readEntryHeader();
         readStandardInformation(currOffset);
         readFileNameAttribute(currOffset);
-        cout << endl;
+        parentID = readParentID(FNA.parentID);
+
+        cout << "Entry " << i << endl;
+
+        // ID của entry
+        cout << "ID: " << EH.ID << endl;
+
+        // parentID của entry
+        cout << "Parent ID: " << parentID << endl;
+
+        // Tên của entry
+        printFileName(FNA.fileNameLength);
+
+        cout << "=================" << endl;
     }
 }
 
-void getCurrDirEntries(unsigned int currDirID)
+void listCurrDir(unsigned int currDirID = 5)
 {
     // Khi nào thì MFT kết thúc?
     for (int i = 0; i < 100; i++)
@@ -107,14 +99,15 @@ void getCurrDirEntries(unsigned int currDirID)
 
         BYTE entry[1024];
         getNthEntry(entry, i);
-
         int currentOffset = STANDARD_INFORMATION_OFFSET;
-        tuple<int, int> tp = readEntryHeader();
+
+        readEntryHeader();
+        tuple<int, int> tp = readEntryFlags(EH.flags);
         readStandardInformation(currentOffset);
         readFileNameAttribute(currentOffset);
-        parentID = readParentID(FN.parentID);
+        parentID = readParentID(FNA.parentID);
 
-        if (parentID == currDirID && fileName)
+        if (parentID == currDirID && FILE_NAME)
         {
             if (!EH.ID && i > 0)
                 continue;
@@ -131,7 +124,7 @@ void getCurrDirEntries(unsigned int currDirID)
             cout << "Parent ID: " << parentID << endl;
 
             // Tên của entry
-            printFileName(FN.fileNameLength);
+            printFileName(FNA.fileNameLength);
 
             cout << "=================" << endl;
         }
@@ -140,18 +133,14 @@ void getCurrDirEntries(unsigned int currDirID)
     }
 }
 
-tuple<int, int> readEntryHeader()
+void readEntryHeader()
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     fread(&EH, sizeof(EH), 1, fp);
-
-    tuple<int, int> tp = getEntryFlags(EH.flags);
-
     fclose(fp);
-    return tp;
 }
 
-tuple<int, int> getEntryFlags(uint16_t flags)
+tuple<int, int> readEntryFlags(uint16_t flags)
 {
     // Bit 0: trạng thái sử dụng
     int isUsed = flags & 1;
@@ -178,26 +167,13 @@ void readFileNameAttribute(int &currentOffset)
     fseek(fp, currentOffset, SEEK_SET);
     fread(&SAH, sizeof(SAH), 1, fp);
 
-    // cout << "Attribute type: " << SAH.attributeType << endl;
-    // cout << "Attribute total length: " << SAH.totalLength << endl;
-    // cout << "Attribute data length: " << SAH.attrDataLength << endl;
-
     if (SAH.attributeType != 48)
         return;
 
-    fread(&FN, sizeof(FN), 1, fp);
-
-    // printDateTime(convertFileTimeToDateTime(FN.fileCreated), "File created time");
-    // printDateTime(convertFileTimeToDateTime(FN.fileModified), "File modified time");
-    // printDateTime(convertFileTimeToDateTime(FN.MFTChanged), "MFT changed time");
-    // printDateTime(convertFileTimeToDateTime(FN.lastAccess), "Last access time");
-    // cout << "File permissions: " << FN.fileAttributes << endl;
-    // cout << "File name length: " << (int)FN.fileNameLength << endl;
-    // cout << "File name format: " << (int)FN.fileNameFormat << endl;
-
-    readFileName(fp, FN.fileNameLength);
-
+    fread(&FNA, sizeof(FNA), 1, fp);
+    readFileName(fp, FNA.fileNameLength);
     fclose(fp);
+
     currentOffset += SAH.totalLength;
 }
 
@@ -210,20 +186,21 @@ uint32_t readParentID(char parentID[6])
 
 void readFileName(FILE *fp, int fileNameLength)
 {
-    fileName = new uint16_t[100];
+    FILE_NAME = new uint16_t[100];
+
     for (int i = 0; i < fileNameLength; i++)
-        fread(&fileName[i], 2, 1, fp);
+        fread(&FILE_NAME[i], 2, 1, fp);
 }
 
 void printFileName(int fileNameLength)
 {
     cout << "Name: ";
     for (int i = 0; i < fileNameLength; i++)
-        cout << (char)fileName[i];
+        cout << (char)FILE_NAME[i];
     cout << endl;
 
-    delete[] fileName;
-    fileName = nullptr;
+    delete[] FILE_NAME;
+    FILE_NAME = nullptr;
 }
 
 void readDataAttribute(int currOffset)
@@ -231,18 +208,50 @@ void readDataAttribute(int currOffset)
     FILE *fp = fopen("MFT.bin", "rb");
     fseek(fp, currOffset, SEEK_SET);
 
-    DataHeader DAH;
-    fread(&DAH, sizeof(DAH), 1, fp);
-
+    DataAttributeHeader DH;
+    fread(&DH, sizeof(DH), 1, fp);
     fclose(fp);
+
+    currOffset += DH.totalLength;
+}
+
+void menu()
+{
+    do
+    {
+        string DRIVE = convertWideCharToString(INPUT_DRIVE);
+        cout << DRIVE << "\\" << CURRENT_DIR_ID << "\\"
+             << ">";
+
+        string COMMAND;
+        getline(cin, COMMAND);
+        handleCommands(COMMAND);
+    } while (1);
+}
+
+string convertWideCharToString(const wchar_t *characters)
+{
+    wstring ws(characters);
+    string str(ws.begin(), ws.end());
+    return str;
+}
+
+void handleCommands(string command)
+{
+    if (command == "cls")
+        system("cls");
+    if (command == "ls")
+        listCurrDir(CURRENT_DIR_ID);
+    else
+        cout << "Can not regconize " << command << endl;
 }
 
 int main(int argc, char **argv)
 {
 
 // Đọc các entry của thư mục dựa trên ID
-#if 1
-    getCurrDirEntries(5);
+#if 0
+    listCurrDir();
 #endif
 
 // Đọc entry thứ n
@@ -253,6 +262,8 @@ int main(int argc, char **argv)
     int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
     nextAttrOffset = readFileNameAttribute(nextAttrOffset);
 #endif
+
+    menu();
 
     return 0;
 }

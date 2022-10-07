@@ -17,6 +17,9 @@
         "xiosbase": "cpp",
         "cstdint": "cpp",
         "tuple": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "array": "cpp",
+        "initializer_list": "cpp",
+        "sstream": "cpp"
     }
 }
