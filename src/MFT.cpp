@@ -224,7 +224,7 @@ void menu()
     {
         string DRIVE = convertWideCharToString(INPUT_DRIVE);
         cout << DRIVE << "\\" << DIR_STACK.back() << "\\"
-             << ">";
+             << " > ";
 
         string COMMAND;
         getline(cin, COMMAND);
