@@ -51,7 +51,7 @@ struct StandardAttributeHeader
     uint8_t padding;
 };
 
-struct FileName
+struct FileNameAttribute
 {
     char parentID[6];
     char parentSeqNum[2];
@@ -87,7 +87,7 @@ struct DataHeader
 };
 void readEntryHeader();
 void checkEntryFlags(uint16_t flags);
-int readStandardInformation(int attrOffset);
-int readFileNameAttribute(int attrOffset);
+void readStandardInformation(int &currentOffset);
+void readFileNameAttribute(int &currentOffset);
 void printFileName(FILE *fp, uint16_t fileName[], int fileNameLength);
 void printParentID(char parentID[6]);

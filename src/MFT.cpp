@@ -1,5 +1,9 @@
 #include "MFT.h"
 
+EntryHeader EH;
+StandardAttributeHeader SAH;
+FileNameAttribute FN;
+
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {
 
@@ -55,7 +59,7 @@ void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, B
     }
 }
 
-void readNthEntry(BYTE entry[1024], int entryOffset = 0)
+void getNthEntry(BYTE entry[1024], int entryOffset = 0)
 {
     LARGE_INTEGER li;
 
@@ -65,6 +69,7 @@ void readNthEntry(BYTE entry[1024], int entryOffset = 0)
     li.QuadPart = readSector;
 
     getEntry(INPUT_DRIVE, li.LowPart, &li.HighPart, entry);
+    writeEntryToFile(entry);
 }
 
 void writeEntryToFile(BYTE entry[1024])
@@ -79,21 +84,25 @@ void showEntries(int quantity)
     for (int i = 0; i < quantity; i++)
     {
         BYTE entry[1024];
-        readNthEntry(entry, i);
-        writeEntryToFile(entry);
+        getNthEntry(entry, i);
 
         cout << "entry " << i << ": ";
+        int currOffset = STANDARD_INFORMATION_OFFSET;
         readEntryHeader();
-        int currAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
-        currAttrOffset = readFileNameAttribute(currAttrOffset);
+        readStandardInformation(currOffset);
+        readFileNameAttribute(currOffset);
         cout << endl;
     }
+}
+
+void getCurrDirEntries(int parentID)
+{
+
 }
 
 void readEntryHeader()
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    EntryHeader EH;
     fread(&EH, sizeof(EH), 1, fp);
 
     checkEntryFlags(EH.flags);
@@ -116,26 +125,20 @@ void checkEntryFlags(uint16_t flags)
     cout << result << endl;
 }
 
-int readStandardInformation(int currentOffset)
+void readStandardInformation(int &currentOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     fseek(fp, currentOffset, SEEK_SET);
-
-    StandardAttributeHeader SAH;
     fread(&SAH, sizeof(SAH), 1, fp);
-
     fclose(fp);
 
-    int nextOffset = currentOffset + SAH.totalLength;
-    return nextOffset;
+    currentOffset += SAH.totalLength;
 }
 
-int readFileNameAttribute(int currentOffset)
+void readFileNameAttribute(int &currentOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     fseek(fp, currentOffset, SEEK_SET);
-
-    StandardAttributeHeader SAH;
     fread(&SAH, sizeof(SAH), 1, fp);
 
     // cout << "Attribute type: " << SAH.attributeType << endl;
@@ -143,9 +146,8 @@ int readFileNameAttribute(int currentOffset)
     // cout << "Attribute data length: " << SAH.attrDataLength << endl;
 
     if (SAH.attributeType != 48)
-        return currentOffset + SAH.totalLength;
+        return;
 
-    FileName FN;
     fread(&FN, sizeof(FN), 1, fp);
 
     printParentID(FN.parentID);
@@ -162,8 +164,7 @@ int readFileNameAttribute(int currentOffset)
 
     fclose(fp);
 
-    int nextOffset = currentOffset + SAH.totalLength;
-    return nextOffset;
+    currentOffset += SAH.totalLength;
 }
 
 void printParentID(char parentID[6])
@@ -205,8 +206,7 @@ int main(int argc, char **argv)
 // Đọc entry thứ n
 #if 0
     BYTE entry[1024];
-    readNthEntry(entry, 1);
-    writeEntryToFile(entry);
+    getNthEntry(entry, 1);
     readEntryHeader();
     int nextAttrOffset = readStandardInformation(STANDARD_INFORMATION_OFFSET);
     nextAttrOffset = readFileNameAttribute(nextAttrOffset);
