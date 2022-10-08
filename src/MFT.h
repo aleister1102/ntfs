@@ -96,34 +96,6 @@ void readFileNameAttribute(int &currentOffset);
 unsigned int readParentID(char parentID[6]);
 void readFileName(FILE *fp, int fileNameLength);
 void printFileName(int fileNameLength);
-string convertWideCharToString(const wchar_t *characters);
 vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
-string getPartition();
-const wchar_t *convertStringToWideChar(string str);
 void printCurrDir();
-const wchar_t *selectPartition();
-const wchar_t *convertStringToWideString(string str);
-
-SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
-{
-
-    long long value = filetime;
-    FILETIME ft = {0};
-
-    ft.dwHighDateTime = (value & 0xffffffff00000000) >> 32;
-    ft.dwLowDateTime = value & 0xffffffff;
-
-    SYSTEMTIME sys = {0};
-    FileTimeToSystemTime(&ft, &sys);
-
-    return sys;
-}
-
-void printDateTime(SYSTEMTIME datetime, string prefix = "")
-{
-    string day[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-    string month[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
-
-    cout << prefix << ": " << day[datetime.wDayOfWeek] << "," << month[datetime.wMonth - 1] << " " << datetime.wDay << "," << datetime.wYear << " " << datetime.wHour << ":" << datetime.wMinute << ":" << datetime.wSecond << endl;
-}
