@@ -63,11 +63,12 @@ void writeEntryToFile(BYTE entry[1024])
 
 void listCurrDir(unsigned int currDirID = 5)
 {
+    cout << "-----------------------------------------------------------------------------" << endl;
+    cout << "Type\tStatus\t\tID\tParent ID\tName" << endl;
+
     // Khi nào thì MFT kết thúc?
     for (int i = 0; i < 100; i++)
     {
-        int isUsed;
-        int isDir;
         unsigned int parentID;
 
         BYTE entry[1024];
@@ -86,24 +87,25 @@ void listCurrDir(unsigned int currDirID = 5)
                 continue;
 
             // Loại và trạng thái của entry
-            string result = get<1>(tp) ? "Directory " : "File ";
-            result += get<0>(tp) ? "is being used" : "";
-            cout << result << endl;
+            string isDir = get<0>(tp) ? "dir" : "file";
+            cout << isDir << "\t";
+            string isUsed = get<1>(tp) ? "being used" : "";
+            cout << isUsed << "\t";
 
             // ID của entry
-            cout << "ID: " << EH.ID << endl;
+            cout << EH.ID << "\t";
 
             // parentID của entry
-            cout << "Parent ID: " << parentID << endl;
+            cout << parentID << "\t\t";
 
             // Tên của entry
             printFileName(FNA.fileNameLength);
 
-            cout << "=================" << endl;
+            cout << endl;
         }
-
         parentID = -1;
     }
+    cout << "-----------------------------------------------------------------------------" << endl;
 }
 
 void readEntryHeader()
@@ -121,7 +123,7 @@ tuple<int, int> readEntryFlags(uint16_t flags)
     flags = flags >> 1;
     int isDir = flags & 1;
 
-    return make_tuple(isUsed, isDir);
+    return make_tuple(isDir, isUsed);
 }
 
 void readStandardInformation(int &currentOffset)
@@ -167,10 +169,8 @@ void readFileName(FILE *fp, int fileNameLength)
 
 void printFileName(int fileNameLength)
 {
-    cout << "Name: ";
     for (int i = 0; i < fileNameLength; i++)
         cout << (char)FILE_NAME[i];
-    cout << endl;
 
     delete[] FILE_NAME;
     FILE_NAME = nullptr;
@@ -230,7 +230,7 @@ int handleCommands(vector<string> args)
 {
     if (args[0] == "cls")
         system("cls");
-    else if (args[0] == "ls")
+    else if (args[0] == "dir")
         listCurrDir(DIR_STACK.back());
     else if (args[0] == "cd")
     {
