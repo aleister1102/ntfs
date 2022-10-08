@@ -3,6 +3,7 @@
 #pragma pack(1)
 
 #include <cstdint>
+#include <cwchar>
 #include <iostream>
 #include <regex>
 #include <sstream>
@@ -13,13 +14,11 @@
 #include <windows.h>
 using namespace std;
 
-LPCWSTR INPUT_DRIVE = L"\\\\.\\D:";
 const char *ENTRY_FILENAME = "entry.bin";
 long long START_CLUSTER = 786432;
 long SECTOR_PER_CLUSTER = 8;
 long SECTOR_SIZE = 512;
 int STANDARD_INFORMATION_OFFSET = 56;
-int FILE_NAME_OFFSET = 128;
 
 struct EntryHeader
 {
@@ -100,6 +99,11 @@ void printFileName(int fileNameLength);
 string convertWideCharToString(const wchar_t *characters);
 vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
+string getPartition();
+const wchar_t *convertStringToWideChar(string str);
+void printCurrDir();
+const wchar_t *selectPartition();
+const wchar_t *convertStringToWideString(string str);
 
 SYSTEMTIME convertFileTimeToDateTime(uint64_t filetime)
 {

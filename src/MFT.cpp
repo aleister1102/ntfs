@@ -5,9 +5,8 @@ StandardAttributeHeader SAH;
 FileNameAttribute FNA;
 uint16_t *FILE_NAME = nullptr;
 
-int ROOT_DIR = 5;
-vector<int> DIR_STACK = {ROOT_DIR};
-string DIR_PATTERN = "[0-9]+";
+const wchar_t *CURRENT_DRIVE = L"\\\\.\\D:";
+vector<int> DIR_STACK = {5};
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
@@ -50,7 +49,7 @@ void getNthEntry(BYTE entry[1024], int entryOffset = 0)
     uint64_t readSector = startSector + bypassSector;
     li.QuadPart = readSector;
 
-    getEntry(INPUT_DRIVE, li.LowPart, &li.HighPart, entry);
+    getEntry(CURRENT_DRIVE, li.LowPart, &li.HighPart, entry);
     writeEntryToFile(entry);
 }
 
@@ -191,25 +190,23 @@ void readDataAttribute(int currOffset)
 void menu()
 {
     int running = true;
+
     do
     {
-        string DRIVE = convertWideCharToString(INPUT_DRIVE);
-        cout << DRIVE << "\\" << DIR_STACK.back() << "\\"
-             << " > ";
+        wcout << CURRENT_DRIVE[4] << " > ";
+        printCurrDir();
 
-        string COMMAND;
-        getline(cin, COMMAND);
-        vector<string> args = split(COMMAND);
+        string command;
+        getline(cin, command);
+        vector<string> args = split(command);
         running = handleCommands(args);
-
     } while (running);
 }
 
-string convertWideCharToString(const wchar_t *characters)
+void printCurrDir()
 {
-    wstring ws(characters);
-    string str(ws.begin(), ws.end());
-    return str;
+    for (int i = 0; i < DIR_STACK.size(); i++)
+        cout << DIR_STACK.at(i) << "\\";
 }
 
 vector<string> split(const string &s, char delim)
