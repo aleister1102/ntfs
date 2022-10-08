@@ -63,7 +63,7 @@ void writeEntryToFile(BYTE entry[1024])
 void listCurrDir(unsigned int currDirID = 5)
 {
     cout << "-----------------------------------------------------------------------------" << endl;
-    cout << "Type\tStatus\t\tID\tParent ID\tName" << endl;
+    cout << "Type\tStatus\t\tID\tName" << endl;
 
     // Khi nào thì MFT kết thúc?
     for (int i = 0; i < 100; i++)
@@ -93,9 +93,6 @@ void listCurrDir(unsigned int currDirID = 5)
 
             // ID của entry
             cout << EH.ID << "\t";
-
-            // parentID của entry
-            cout << parentID << "\t\t";
 
             // Tên của entry
             printFileName(FNA.fileNameLength);
