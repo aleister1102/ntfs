@@ -240,7 +240,21 @@ void menu()
 void printCurrDir()
 {
     for (int i = 0; i < directoryStack.size(); i++)
-        cout << directoryStack.at(i) << "\\";
+    {
+        int dirID = directoryStack.at(i);
+        for (int i = 0; i < directoryEntries.size(); i++)
+        {
+            if (directoryEntries.at(i).ID == dirID)
+            {
+                if (directoryEntries.at(i).entryName != ".")
+                {
+                    cout << directoryEntries.at(i).entryName << "\\";
+                    break;
+                }
+            }
+        }
+    }
+
     cout << " > ";
 }
 
@@ -375,6 +389,7 @@ void printFileContent(FILE *fp, int currentOffset)
 
 int main(int argc, char **argv)
 {
+    getCurrDir();
     menu();
 
     return 0;
