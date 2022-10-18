@@ -60,7 +60,7 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void listCurrDir(unsigned int currDirID = 5)
+void getCurrDir(unsigned int currDirID = 5)
 {
     cout << "-----------------------------------------------------------------------------" << endl;
     cout << "Type\tStatus\t\tID\tName" << endl;
@@ -158,18 +158,14 @@ tuple<int, int> readEntryFlags(uint16_t flags)
 void readStandardInformation(int &currentOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, currentOffset, SEEK_SET);
-    fread(&SAH, sizeof(SAH), 1, fp);
+    readStandardAttributeHeader(fp, currentOffset);
     fclose(fp);
-
-    currentOffset += SAH.totalLength;
 }
 
 void readFileNameAttribute(int &currentOffset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, currentOffset, SEEK_SET);
-    fread(&SAH, sizeof(SAH), 1, fp);
+    readStandardAttributeHeader(fp, currentOffset);
 
     if (SAH.attributeType != 48)
         return;
@@ -177,7 +173,12 @@ void readFileNameAttribute(int &currentOffset)
     fread(&FNA, sizeof(FNA), 1, fp);
     readFileName(fp, FNA.fileNameLength);
     fclose(fp);
+}
 
+void readStandardAttributeHeader(FILE *fp, int &currentOffset)
+{
+    fseek(fp, currentOffset, SEEK_SET);
+    fread(&SAH, sizeof(SAH), 1, fp);
     currentOffset += SAH.totalLength;
 }
 
@@ -262,10 +263,12 @@ int handleCommands(vector<string> args)
     if (args[0] == "cls")
         system("cls");
     else if (args[0] == "dir")
-        listCurrDir(directoryStack.back());
+        getCurrDir(directoryStack.back());
     else if (args[0] == "cd")
     {
-        if (args[1] == "..")
+        if (args.size() < 2)
+            cout << "Missing input" << endl;
+        else if (args[1] == "..")
         {
             if (directoryStack.back() != 5)
                 directoryStack.pop_back();
@@ -278,17 +281,27 @@ int handleCommands(vector<string> args)
                 directoryStack.push_back(entryID);
         }
     }
+    else if (args[0] == "cat")
+    {
+        if (args.size() < 2)
+            cout << "Missing input" << endl;
+        else
+        {
+            string input = args[1];
+            readFileContent(input);
+        }
+    }
     else if (args[0] == "exit")
         return 0;
     else
-        cout << "Can not regconize " << args[0] << " command" << endl;
+        cout << "Can not regconize '" << args[0] << "' command" << endl;
 
     return 1;
 }
 
 bool validateInputDirectory(string input, int parentID, int &ID)
 {
-    EntryInfos entryInfos = findDirectoryInfos(input, directoryStack.back());
+    EntryInfos entryInfos = findEntryInfos(input, directoryStack.back());
     bool valid = true;
 
     if (entryInfos.ID < 0)
@@ -307,7 +320,7 @@ bool validateInputDirectory(string input, int parentID, int &ID)
     return valid;
 }
 
-EntryInfos findDirectoryInfos(string dirName, int parentID)
+EntryInfos findEntryInfos(string dirName, int parentID)
 {
     for (auto entry : directoryEntries)
     {
@@ -316,6 +329,48 @@ EntryInfos findDirectoryInfos(string dirName, int parentID)
     }
 
     return EntryInfos();
+}
+
+void readFileContent(string input)
+{
+    EntryInfos entryInfos = findEntryInfos(input, directoryStack.back());
+
+    if (entryInfos.ID < 0)
+    {
+        cout << "Can not find " << input << endl;
+        return;
+    }
+
+    BYTE entry[1024];
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    int currentOffset = STANDARD_INFORMATION_OFFSET;
+
+    getNthEntryAndWriteToFile(entry, entryInfos.ID);
+    readEntryHeader();
+
+    do
+    {
+        if (SAH.attributeType == 0x80)
+            printFileContent(fp, currentOffset);
+
+        readStandardAttributeHeader(fp, currentOffset);
+
+    } while (SAH.attributeType != 0xFFFFFFFF);
+}
+
+void printFileContent(FILE *fp, int currentOffset)
+{
+    int dataOffset = currentOffset - SAH.totalLength + sizeof(StandardAttributeHeader);
+    fseek(fp, dataOffset, SEEK_SET);
+
+    char buffer;
+    for (int i = 0; i < SAH.attrDataLength; i++)
+    {
+        fread(&buffer, 1, 1, fp);
+        cout << buffer;
+    }
+
+    cout << endl;
 }
 
 int main(int argc, char **argv)
