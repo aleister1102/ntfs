@@ -3,10 +3,10 @@
 EntryHeader EH;
 StandardAttributeHeader SAH;
 FileNameAttribute FNA;
-uint16_t *currentFileName = nullptr;
 
-const wchar_t *CURRENT_DRIVE = L"\\\\.\\U:";
+uint16_t *currentFileName = nullptr;
 vector<int> directoryStack = {5};
+vector<EntryInfos> directoryEntries;
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
@@ -40,7 +40,7 @@ void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, B
     }
 }
 
-void getNthEntry(BYTE entry[1024], int entryOffset = 0)
+void getNthEntryAndWriteToFile(BYTE entry[1024], int entryOffset = 0)
 {
     LARGE_INTEGER li;
 
@@ -72,7 +72,7 @@ void listCurrDir(unsigned int currDirID = 5)
         tuple<int, int> flags;
         unsigned int parentID;
 
-        getNthEntry(entry, i);
+        getNthEntryAndWriteToFile(entry, i);
         readEntry(flags, parentID);
 
         if (parentID == currDirID && currentFileName)
@@ -81,10 +81,12 @@ void listCurrDir(unsigned int currDirID = 5)
             if (!EH.ID && i > 0)
                 continue;
 
+            saveEntryInfos(parentID, flags);
             printEntry(flags);
         }
         parentID = -1;
     }
+
     cout << "-----------------------------------------------------------------------------" << endl;
 }
 
@@ -112,7 +114,27 @@ void printEntry(tuple<int, int> tp)
 
     // Tên của entry
     printFileName(FNA.fileNameLength);
+    releaseFileNameBuffer();
     cout << endl;
+}
+
+void saveEntryInfos(int parentID, tuple<int, int> flags)
+{
+    EntryInfos EI;
+
+    // Chuyển tên của entry thành string
+    char *buffer = new char[FNA.fileNameLength + 1];
+    for (int i = 0; i < FNA.fileNameLength; i++)
+        buffer[i] = (char)currentFileName[i];
+    buffer[FNA.fileNameLength] = '\0';
+
+    EI.entryName = buffer;
+    EI.ID = EH.ID;
+    EI.parentID = parentID;
+    EI.isDir = get<0>(flags);
+    EI.isUsed = get<1>(flags);
+
+    directoryEntries.push_back(EI);
 }
 
 void readEntryHeader()
@@ -178,7 +200,10 @@ void printFileName(int fileNameLength)
 {
     for (int i = 0; i < fileNameLength; i++)
         cout << (char)currentFileName[i];
+}
 
+void releaseFileNameBuffer()
+{
     delete[] currentFileName;
     currentFileName = nullptr;
 }
@@ -246,16 +271,51 @@ int handleCommands(vector<string> args)
                 directoryStack.pop_back();
             return 1;
         }
-
-        if (stoi(args[1]))
-            directoryStack.push_back(stoi(args[1])); // cần kiểm soát lỗi
+        else
+        {
+            int entryID;
+            if (validateInputDirectory(args[1], directoryStack.back(), entryID))
+                directoryStack.push_back(entryID);
+        }
     }
     else if (args[0] == "exit")
         return 0;
     else
-        cout << "Can not regconize " << args[0] << endl;
+        cout << "Can not regconize " << args[0] << " command" << endl;
 
     return 1;
+}
+
+bool validateInputDirectory(string input, int parentID, int &ID)
+{
+    EntryInfos entryInfos = findDirectoryInfos(input, directoryStack.back());
+    bool valid = true;
+
+    if (entryInfos.ID < 0)
+    {
+        cout << "Can not find " << input << endl;
+        valid = false;
+    }
+    else if (!entryInfos.isDir)
+    {
+        cout << input << " is not directory" << endl;
+        valid = false;
+    }
+    else
+        ID = entryInfos.ID;
+
+    return valid;
+}
+
+EntryInfos findDirectoryInfos(string dirName, int parentID)
+{
+    for (auto entry : directoryEntries)
+    {
+        if (entry.parentID == parentID && entry.entryName == dirName)
+            return entry;
+    }
+
+    return EntryInfos();
 }
 
 int main(int argc, char **argv)

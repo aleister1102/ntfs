@@ -14,6 +14,7 @@
 #include <windows.h>
 using namespace std;
 
+const wchar_t *CURRENT_DRIVE = L"\\\\.\\U:";
 const char *ENTRY_FILENAME = "entry.bin";
 long long START_CLUSTER = 786432;
 long SECTOR_PER_CLUSTER = 8;
@@ -87,9 +88,20 @@ struct DataAttributeHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
+
+struct EntryInfos
+{
+    string entryName;
+    int ID = -1;
+    int parentID;
+    int isDir;
+    int isUsed;
+};
+
 void writeEntryToFile(BYTE entry[1024]);
 void readEntry(tuple<int, int> &flags, unsigned int &parentID);
 void printEntry(tuple<int, int> tp);
+void saveEntryInfos(int parentID, tuple<int, int> flags);
 void readEntryHeader();
 tuple<int, int> readEntryFlags(uint16_t flags);
 void readStandardInformation(int &currentOffset);
@@ -100,3 +112,7 @@ void printFileName(int fileNameLength);
 vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
 void printCurrDir();
+void readFileContent(string input);
+void releaseFileNameBuffer();
+bool validateInputDirectory(string input, int parentID, int &ID);
+EntryInfos findDirectoryInfos(string dirName, int parentID);
