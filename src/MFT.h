@@ -87,8 +87,9 @@ struct DataAttributeHeader
     uint64_t realSize;
     uint64_t initializedSize;
 };
-
 void writeEntryToFile(BYTE entry[1024]);
+void readEntry(tuple<int, int> &flags, unsigned int &parentID);
+void printEntry(tuple<int, int> tp);
 void readEntryHeader();
 tuple<int, int> readEntryFlags(uint16_t flags);
 void readStandardInformation(int &currentOffset);

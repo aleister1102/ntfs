@@ -3,10 +3,10 @@
 EntryHeader EH;
 StandardAttributeHeader SAH;
 FileNameAttribute FNA;
-uint16_t *FILE_NAME = nullptr;
+uint16_t *currentFileName = nullptr;
 
-const wchar_t *CURRENT_DRIVE = L"\\\\.\\D:";
-vector<int> DIR_STACK = {5};
+const wchar_t *CURRENT_DRIVE = L"\\\\.\\U:";
+vector<int> directoryStack = {5};
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
@@ -68,40 +68,51 @@ void listCurrDir(unsigned int currDirID = 5)
     // Khi nào thì MFT kết thúc?
     for (int i = 0; i < 100; i++)
     {
+        BYTE entry[1024];
+        tuple<int, int> flags;
         unsigned int parentID;
 
-        BYTE entry[1024];
         getNthEntry(entry, i);
-        int currentOffset = STANDARD_INFORMATION_OFFSET;
+        readEntry(flags, parentID);
 
-        readEntryHeader();
-        tuple<int, int> tp = readEntryFlags(EH.flags);
-        readStandardInformation(currentOffset);
-        readFileNameAttribute(currentOffset);
-        parentID = readParentID(FNA.parentID);
-
-        if (parentID == currDirID && FILE_NAME)
+        if (parentID == currDirID && currentFileName)
         {
+            // Bỏ qua các entry không phải là file hoặc thư mục
             if (!EH.ID && i > 0)
                 continue;
 
-            // Loại và trạng thái của entry
-            string isDir = get<0>(tp) ? "dir" : "file";
-            cout << isDir << "\t";
-            string isUsed = get<1>(tp) ? "being used" : "";
-            cout << isUsed << "\t";
-
-            // ID của entry
-            cout << EH.ID << "\t";
-
-            // Tên của entry
-            printFileName(FNA.fileNameLength);
-
-            cout << endl;
+            printEntry(flags);
         }
         parentID = -1;
     }
     cout << "-----------------------------------------------------------------------------" << endl;
+}
+
+void readEntry(tuple<int, int> &flags, unsigned int &parentID)
+{
+    int currentOffset = STANDARD_INFORMATION_OFFSET;
+
+    readEntryHeader();
+    flags = readEntryFlags(EH.flags);
+    readStandardInformation(currentOffset);
+    readFileNameAttribute(currentOffset);
+    parentID = readParentID(FNA.parentID);
+}
+
+void printEntry(tuple<int, int> tp)
+{
+    // Loại và trạng thái của entry
+    string isDir = get<0>(tp) ? "dir" : "file";
+    cout << isDir << "\t";
+    string isUsed = get<1>(tp) ? "being used" : "";
+    cout << isUsed << "\t";
+
+    // ID của entry
+    cout << EH.ID << "\t";
+
+    // Tên của entry
+    printFileName(FNA.fileNameLength);
+    cout << endl;
 }
 
 void readEntryHeader()
@@ -157,19 +168,19 @@ uint32_t readParentID(char parentID[6])
 
 void readFileName(FILE *fp, int fileNameLength)
 {
-    FILE_NAME = new uint16_t[100];
+    currentFileName = new uint16_t[100];
 
     for (int i = 0; i < fileNameLength; i++)
-        fread(&FILE_NAME[i], 2, 1, fp);
+        fread(&currentFileName[i], 2, 1, fp);
 }
 
 void printFileName(int fileNameLength)
 {
     for (int i = 0; i < fileNameLength; i++)
-        cout << (char)FILE_NAME[i];
+        cout << (char)currentFileName[i];
 
-    delete[] FILE_NAME;
-    FILE_NAME = nullptr;
+    delete[] currentFileName;
+    currentFileName = nullptr;
 }
 
 void readDataAttribute(int currOffset)
@@ -190,7 +201,7 @@ void menu()
 
     do
     {
-        wcout << CURRENT_DRIVE[4] << " > ";
+        wcout << CURRENT_DRIVE[4] << "\\";
         printCurrDir();
 
         string command;
@@ -202,8 +213,9 @@ void menu()
 
 void printCurrDir()
 {
-    for (int i = 0; i < DIR_STACK.size(); i++)
-        cout << DIR_STACK.at(i) << "\\";
+    for (int i = 0; i < directoryStack.size(); i++)
+        cout << directoryStack.at(i) << "\\";
+    cout << " > ";
 }
 
 vector<string> split(const string &s, char delim)
@@ -225,18 +237,18 @@ int handleCommands(vector<string> args)
     if (args[0] == "cls")
         system("cls");
     else if (args[0] == "dir")
-        listCurrDir(DIR_STACK.back());
+        listCurrDir(directoryStack.back());
     else if (args[0] == "cd")
     {
         if (args[1] == "..")
         {
-            if (DIR_STACK.back() != 5)
-                DIR_STACK.pop_back();
+            if (directoryStack.back() != 5)
+                directoryStack.pop_back();
             return 1;
         }
 
         if (stoi(args[1]))
-            DIR_STACK.push_back(stoi(args[1])); // cần kiểm soát lỗi
+            directoryStack.push_back(stoi(args[1])); // cần kiểm soát lỗi
     }
     else if (args[0] == "exit")
         return 0;
