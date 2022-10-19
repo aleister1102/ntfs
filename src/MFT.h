@@ -112,9 +112,11 @@ void writeEntryToFile(BYTE entry[1024]);
 
 void readEntry(Entry &entry);
 void readEntryHeader(EntryBuffers &buffers, int &offset);
-void readStandardInformation(EntryBuffers &buffers, int &offset);
-void readFileNameAttribute(EntryBuffers &buffers, int &offset);
-void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int &currentOffset);
+void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int offset);
+
+void readStandardInformation(EntryBuffers &buffers, int offset);
+void readFileNameAttribute(EntryBuffers &buffers, int offset);
+void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset);
 void readFileName(EntryBuffers &buffers, FILE *fp);
 void parseFileName(Entry &entry, EntryBuffers buffers);
 void parseParentIDs(Entry &entry, EntryBuffers &buffers);

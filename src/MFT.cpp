@@ -78,19 +78,33 @@ void getCurrDir(int currDirID = 5)
     }
 }
 
-void printEntry(Entry entry)
+void readEntry(Entry &entry)
 {
-    // Loại và trạng thái của entry
-    string isDir = entry.isDir ? "dir" : "file";
-    cout << isDir << "\t";
-    string isUsed = entry.isUsed ? "being used" : "";
-    cout << isUsed << "\t";
+    int offset = 0;
+    EntryBuffers buffers;
+    uint32_t signature = 0, length = 0;
 
-    // ID của entry
-    cout << entry.ID << "\t";
+    readEntryHeader(buffers, offset);
+    do
+    {
+        readAttributeSignatureAndLength(signature, length, offset);
+        // Standard Information
+        if (signature == 0x10)
+        {
+            readStandardInformation(buffers, offset);
+        }
+        // File name
+        else if (signature == 0x30)
+        {
+            readFileNameAttribute(buffers, offset);
 
-    // Tên của entry
-    cout << entry.entryName << endl;
+            parseFileName(entry, buffers);
+            parseEntryFlags(entry, buffers);
+            parseParentIDs(entry, buffers);
+        }
+
+        offset += length;
+    } while (signature != 0xFFFFFFFF && signature != 0x0);
 }
 
 void readEntryHeader(EntryBuffers &buffers, int &offset)
@@ -102,31 +116,33 @@ void readEntryHeader(EntryBuffers &buffers, int &offset)
     offset += buffers.EH.offsetToFirstAttr;
 }
 
-void readStandardInformation(EntryBuffers &buffers, int &offset)
+void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int offset)
+{
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    fseek(fp, offset, SEEK_SET);
+    fread(&signature, sizeof(signature), 1, fp);
+    fread(&length, sizeof(length), 1, fp);
+    fclose(fp);
+}
+
+void readStandardInformation(EntryBuffers &buffers, int offset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     readStandardAttributeHeader(buffers, fp, offset);
     fclose(fp);
-
-    offset += buffers.SAH.totalLength;
 }
 
-void readFileNameAttribute(EntryBuffers &buffers, int &offset)
+void readFileNameAttribute(EntryBuffers &buffers, int offset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
     readStandardAttributeHeader(buffers, fp, offset);
-
-    if (buffers.SAH.attributeType != 48)
-        return;
 
     fread(&buffers.FNA, sizeof(buffers.FNA), 1, fp);
     readFileName(buffers, fp);
     fclose(fp);
-
-    offset += buffers.SAH.totalLength;
 }
 
-void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int &offset)
+void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset)
 {
     fseek(fp, offset, SEEK_SET);
     fread(&buffers.SAH, sizeof(buffers.SAH), 1, fp);
@@ -174,33 +190,19 @@ void parseParentIDs(Entry &entry, EntryBuffers &buffers)
     entry.ID = buffers.EH.ID;
 }
 
-void readDataAttribute(int currOffset)
+void printEntry(Entry entry)
 {
-    FILE *fp = fopen("MFT.bin", "rb");
-    fseek(fp, currOffset, SEEK_SET);
+    // Loại và trạng thái của entry
+    string isDir = entry.isDir ? "dir" : "file";
+    cout << isDir << "\t";
+    string isUsed = entry.isUsed ? "being used" : "";
+    cout << isUsed << "\t";
 
-    DataAttributeHeader DH;
-    fread(&DH, sizeof(DH), 1, fp);
-    fclose(fp);
+    // ID của entry
+    cout << entry.ID << "\t";
 
-    currOffset += DH.totalLength;
-}
-
-void readEntry(Entry &entry)
-{
-    int offset = 0;
-    EntryBuffers buffers;
-
-    readEntryHeader(buffers, offset);
-    readStandardInformation(buffers, offset);
-    readFileNameAttribute(buffers, offset);
-
-    if (buffers.fileNameBuffer != nullptr)
-    {
-        parseFileName(entry, buffers);
-    }
-    parseEntryFlags(entry, buffers);
-    parseParentIDs(entry, buffers);
+    // Tên của entry
+    cout << entry.entryName << endl;
 }
 
 void printCurrDir()
