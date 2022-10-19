@@ -1,4 +1,6 @@
 # File System
+Chương trình đọc bảng MFT của phân vùng NTFS.
+
 Các câu lệnh:
 - `dir`: liệt kê các tập tin/thư mục có trong thư mục hiện tại.
 - `cd`: thay đổi thư mục.
