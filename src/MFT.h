@@ -1,6 +1,5 @@
 #define UNICODE
-// Yêu cầu compiler cấp phát bộ nhớ đúng với kdl (không padding)
-#pragma pack(1)
+#pragma pack(1) // Yêu cầu compiler cấp phát bộ nhớ đúng với kdl (không padding)
 
 #include <cstdint>
 #include <cwchar>
@@ -13,13 +12,21 @@
 #include <windows.h>
 using namespace std;
 
-int ROOT_DIR = 5;
 const wchar_t *CURRENT_DRIVE = L"\\\\.\\U:";
-const char *ENTRY_FILENAME = "entry.bin";
+
+// Các thông số cơ bản của MFT
+int ROOT_DIR = 5;
+int $MFT_INDEX = 0;
+int MFT_LIMIT = 0;
+
+// Signature của các attribute
 unsigned int STANDARD_INFO = 0x10;
 unsigned int FILE_NAME = 0x30;
 unsigned int DATA = 0x80;
 unsigned int END_MARKER = 0xFFFFFFFF;
+
+// Tên tập tin lưu entry
+const char *ENTRY_FILENAME = "entry.bin";
 
 // Ba hằng số dưới đây là lấy từ phần VBR
 long long START_CLUSTER = 786432;
@@ -77,6 +84,31 @@ struct FileNameAttribute
     uint8_t fileNameFormat;
 };
 
+struct DataAttributeHeader
+{
+    uint32_t attributeType;
+    uint32_t totalLength;
+    uint8_t nonResidentFlag;
+    uint8_t nameLength;
+    uint16_t nameOffset;
+    uint16_t flags;
+    uint16_t attrID;
+    uint64_t firstVCN;
+    uint64_t lastVCN;
+    uint16_t dataRunsOffset;
+    uint16_t compressionUnitSize;
+    uint32_t padding;
+    uint64_t allocatedSize;
+    uint64_t realSize;
+    uint64_t initializedSize;
+};
+
+struct DataRun
+{
+    uint64_t clusterCount = 0;
+    uint64_t clusterOffset = 0;
+};
+
 struct EntryBuffers
 {
     EntryHeader EH;
@@ -92,6 +124,7 @@ struct Entry
     int isDir;
     int isUsed;
     string data;
+    vector<DataRun> dataRuns;
 };
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024]);
@@ -101,11 +134,14 @@ void readEntry(Entry &entry);
 void readEntryHeader(EntryBuffers &buffers, int &offset);
 void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int offset);
 
+void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset);
+
 void readStandardInformation(EntryBuffers &buffers, int offset);
 void readFileNameAttribute(EntryBuffers &buffers, int offset);
-void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset);
 void readFileName(EntryBuffers &buffers, FILE *fp);
-void readData(EntryBuffers &buffers, int offset);
+
+void readDataRuns(Entry &entry, int offset);
+
 void parseEntryFlags(Entry &entry, EntryBuffers &buffers);
 void parseParentIDs(Entry &entry, EntryBuffers &buffers);
 void parseFileName(Entry &entry, EntryBuffers &buffers);
@@ -113,15 +149,18 @@ void parseData(Entry &entry, EntryBuffers &buffers);
 
 void printEntry(Entry entry);
 
+// Kiểm soát các câu lệnh
 void printDirStack();
 vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
 Entry findEntry(string dirName);
 
+// Câu lệnh "cd"
 bool validateInputDirectory(Entry &entry, string input);
 bool checkExistence(Entry entry, string input);
 bool checkDirectory(Entry entry);
 
+// Câu lệnh "cat"
 bool validateTextFile(Entry &entry, string input);
 bool checkTextFile(Entry entry);
 void readTextFile(Entry &entry);
