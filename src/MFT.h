@@ -71,25 +71,6 @@ struct FileNameAttribute
     uint8_t fileNameFormat;
 };
 
-struct DataAttributeHeader
-{
-    uint32_t attributeType;
-    uint32_t totalLength;
-    uint8_t nonResidentFlag;
-    uint8_t nameLength;
-    uint16_t nameOffset;
-    uint16_t flags;
-    uint16_t attrID;
-    uint64_t firstVCN;
-    uint64_t lastVCN;
-    uint16_t dataRunsOffset;
-    uint16_t compressionUnitSize;
-    uint32_t padding;
-    uint64_t allocatedSize;
-    uint64_t realSize;
-    uint64_t initializedSize;
-};
-
 struct EntryBuffers
 {
     EntryHeader EH;
@@ -104,6 +85,7 @@ struct Entry
     unsigned int parentID;
     int isDir;
     int isUsed;
+    string data;
 };
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024]);
@@ -136,4 +118,5 @@ bool checkDirectory(Entry entry);
 
 bool validateTextFile(Entry &entry, string input);
 bool checkTextFile(Entry entry);
-void printTextFileContent(Entry entry);
+void readTextFile(Entry &entry);
+void readTextData(EntryBuffers &buffers, Entry &entry, int offset);

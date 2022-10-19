@@ -298,7 +298,8 @@ int handleCommands(vector<string> args)
             string input = args[1];
             if (validateTextFile(entry, input))
             {
-                printTextFileContent(entry);
+                readTextFile(entry);
+                cout << entry.data << endl;
             }
         }
     }
@@ -366,9 +367,35 @@ bool checkTextFile(Entry entry)
     return true;
 }
 
-void printTextFileContent(Entry entry)
+void readTextFile(Entry &entry)
 {
-    
+    int offset = 0;
+    uint32_t signature = 0, length = 0;
+    EntryBuffers buffers;
+
+    getNthEntryAndWriteToFile(entry.ID);
+    readEntryHeader(buffers, offset);
+    do
+    {
+        readAttributeSignatureAndLength(signature, length, offset);
+        if (signature == 0x80)
+            readTextData(buffers, entry, offset);
+
+        offset += length;
+    } while (signature != 0xFFFFFFFF);
+}
+
+void readTextData(EntryBuffers &buffers, Entry &entry, int offset)
+{
+    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    readStandardAttributeHeader(buffers, fp, offset);
+
+    char *data = new char[buffers.SAH.attrDataLength];
+    fread(data, buffers.SAH.attrDataLength, 1, fp);
+    fclose(fp);
+
+    data[buffers.SAH.attrDataLength] = '\0';
+    entry.data += (string)data;
 }
 
 void init()
