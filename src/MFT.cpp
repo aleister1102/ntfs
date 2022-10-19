@@ -51,12 +51,12 @@ void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, B
 
 void writeEntryToFile(BYTE entry[1024])
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "wb");
+    auto fp = fopen(ENTRY_FILENAME, "wb");
     fwrite(entry, 1, 1024, fp);
     fclose(fp);
 }
 
-void getCurrDir(int currDirID = 5)
+void getCurrDir(int currDirID = ROOT_DIR)
 {
     // Khi nào thì MFT kết thúc?
     for (int i = 0; i < 100; i++)
@@ -89,12 +89,12 @@ void readEntry(Entry &entry)
     {
         readAttributeSignatureAndLength(signature, length, offset);
         // Standard Information
-        if (signature == 0x10)
+        if (signature == STANDARD_INFO)
         {
             readStandardInformation(buffers, offset);
         }
         // File name
-        else if (signature == 0x30)
+        else if (signature == FILE_NAME)
         {
             readFileNameAttribute(buffers, offset);
 
@@ -104,12 +104,12 @@ void readEntry(Entry &entry)
         }
 
         offset += length;
-    } while (signature != 0xFFFFFFFF && signature != 0x0);
+    } while (signature != END_MARKER && signature != 0x0);
 }
 
 void readEntryHeader(EntryBuffers &buffers, int &offset)
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    auto fp = fopen(ENTRY_FILENAME, "rb");
     fread(&buffers.EH, sizeof(buffers.EH), 1, fp);
     fclose(fp);
 
@@ -118,7 +118,7 @@ void readEntryHeader(EntryBuffers &buffers, int &offset)
 
 void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int offset)
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    auto fp = fopen(ENTRY_FILENAME, "rb");
     fseek(fp, offset, SEEK_SET);
     fread(&signature, sizeof(signature), 1, fp);
     fread(&length, sizeof(length), 1, fp);
@@ -127,14 +127,14 @@ void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int 
 
 void readStandardInformation(EntryBuffers &buffers, int offset)
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    auto fp = fopen(ENTRY_FILENAME, "rb");
     readStandardAttributeHeader(buffers, fp, offset);
     fclose(fp);
 }
 
 void readFileNameAttribute(EntryBuffers &buffers, int offset)
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    auto fp = fopen(ENTRY_FILENAME, "rb");
     readStandardAttributeHeader(buffers, fp, offset);
 
     fread(&buffers.FNA, sizeof(buffers.FNA), 1, fp);
@@ -158,7 +158,7 @@ void readFileName(EntryBuffers &buffers, FILE *fp)
 
 void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
 {
-    uint16_t flags = buffers.EH.flags;
+    auto flags = buffers.EH.flags;
 
     // Bit 0: trạng thái sử dụng
     entry.isUsed = flags & 1;
@@ -170,9 +170,10 @@ void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
 void parseParentIDs(Entry &entry, EntryBuffers &buffers)
 {
     char *parentID = buffers.FNA.parentID;
+    int parentIDLength = 6;
 
     uint32_t buffer;
-    memcpy(&buffer, parentID, 6);
+    memcpy(&buffer, parentID, parentIDLength);
     entry.parentID = buffer;
     entry.ID = buffers.EH.ID;
 }
@@ -231,7 +232,7 @@ void menu()
 
         string command;
         getline(cin, command);
-        vector<string> args = split(command);
+        auto args = split(command);
         running = handleCommands(args);
     } while (running);
 }
@@ -250,9 +251,7 @@ vector<string> split(const string &s, char delim)
     string item;
 
     while (getline(ss, item, delim))
-    {
         result.push_back(item);
-    }
 
     return result;
 }
@@ -269,7 +268,7 @@ int handleCommands(vector<string> args)
             cout << "Missing input" << endl;
         else if (args[1] == "..")
         {
-            if (directoryStack.back().ID != 5)
+            if (directoryStack.back().ID != ROOT_DIR)
             {
                 directoryStack.pop_back();
                 entries.clear();
@@ -332,7 +331,7 @@ Entry findEntry(string dirName)
 
 bool checkExistence(Entry entry, string input)
 {
-    if (entry.ID == 0xFFFFFFFF)
+    if (entry.ID == END_MARKER)
     {
         cout << "Can not find " << input << endl;
         return false;
@@ -378,16 +377,16 @@ void readTextFile(Entry &entry)
     do
     {
         readAttributeSignatureAndLength(signature, length, offset);
-        if (signature == 0x80)
+        if (signature == DATA)
             readTextData(buffers, entry, offset);
 
         offset += length;
-    } while (signature != 0xFFFFFFFF);
+    } while (signature != END_MARKER);
 }
 
 void readTextData(EntryBuffers &buffers, Entry &entry, int offset)
 {
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
+    auto fp = fopen(ENTRY_FILENAME, "rb");
     readStandardAttributeHeader(buffers, fp, offset);
 
     char *data = new char[buffers.SAH.attrDataLength];
@@ -401,7 +400,7 @@ void readTextData(EntryBuffers &buffers, Entry &entry, int offset)
 void init()
 {
     Entry entry;
-    getNthEntryAndWriteToFile(5);
+    getNthEntryAndWriteToFile(ROOT_DIR);
     readEntry(entry);
 
     directoryStack.push_back(entry);

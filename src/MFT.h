@@ -13,12 +13,18 @@
 #include <windows.h>
 using namespace std;
 
+int ROOT_DIR = 5;
 const wchar_t *CURRENT_DRIVE = L"\\\\.\\U:";
 const char *ENTRY_FILENAME = "entry.bin";
+unsigned int STANDARD_INFO = 0x10;
+unsigned int FILE_NAME = 0x30;
+unsigned int DATA = 0x80;
+unsigned int END_MARKER = 0xFFFFFFFF;
+
+// Ba hằng số dưới đây là lấy từ phần VBR
 long long START_CLUSTER = 786432;
 long SECTOR_PER_CLUSTER = 8;
 long SECTOR_SIZE = 512;
-int STANDARD_INFORMATION_OFFSET = 56;
 
 struct EntryHeader
 {
