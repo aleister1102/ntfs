@@ -1,6 +1,6 @@
 #include "MFT.h"
 
-vector<int> directoryStack = {5};
+vector<Entry> directoryStack;
 vector<Entry> entries;
 
 void getNthEntryAndWriteToFile(int entryOffset = 0)
@@ -156,17 +156,21 @@ void readFileName(EntryBuffers &buffers, FILE *fp)
         fread(&buffers.fileNameBuffer[i], 2, 1, fp);
 }
 
-void parseFileName(Entry &entry, EntryBuffers buffers)
+void parseFileName(Entry &entry, EntryBuffers &buffers)
 {
     int fileNameLength = buffers.FNA.fileNameLength;
 
+    // Chuyển tên file thành mảng char
     char *buffer = new char[fileNameLength + 1];
     for (int i = 0; i < fileNameLength; i++)
         buffer[i] = (char)buffers.fileNameBuffer[i];
     buffer[fileNameLength] = '\0';
 
-    entry.entryName = string(buffer);
+    // Giải phóng bộ nhớ cũ
+    buffers.fileNameBuffer = nullptr;
     delete[] buffers.fileNameBuffer;
+
+    entry.entryName = string(buffer);
 }
 
 void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
@@ -190,6 +194,17 @@ void parseParentIDs(Entry &entry, EntryBuffers &buffers)
     entry.ID = buffers.EH.ID;
 }
 
+void printCurrDir()
+{
+    cout << "-----------------------------------------------------------------------------" << endl;
+    cout << "Type\tStatus\t\tID\tName" << endl;
+
+    for (auto entry : entries)
+        printEntry(entry);
+
+    cout << "-----------------------------------------------------------------------------" << endl;
+}
+
 void printEntry(Entry entry)
 {
     // Loại và trạng thái của entry
@@ -203,17 +218,6 @@ void printEntry(Entry entry)
 
     // Tên của entry
     cout << entry.entryName << endl;
-}
-
-void printCurrDir()
-{
-    cout << "-----------------------------------------------------------------------------" << endl;
-    cout << "Type\tStatus\t\tID\tName" << endl;
-
-    for (auto entry : entries)
-        printEntry(entry);
-
-    cout << "-----------------------------------------------------------------------------" << endl;
 }
 
 void menu()
@@ -234,22 +238,8 @@ void menu()
 
 void printDirStack()
 {
-    for (int i = 0; i < directoryStack.size(); i++)
-    {
-        int dirID = directoryStack.at(i);
-        for (int i = 0; i < entries.size(); i++)
-        {
-            if (entries.at(i).ID == dirID)
-            {
-                if (entries.at(i).entryName != ".")
-                {
-                    cout << entries.at(i).entryName << "\\";
-                    break;
-                }
-            }
-        }
-    }
-
+    for (auto dir : directoryStack)
+        cout << dir.entryName << "\\";
     cout << " > ";
 }
 
@@ -272,22 +262,29 @@ int handleCommands(vector<string> args)
     if (args[0] == "cls")
         system("cls");
     else if (args[0] == "dir")
-        getCurrDir(directoryStack.back());
+        printCurrDir();
     else if (args[0] == "cd")
     {
         if (args.size() < 2)
             cout << "Missing input" << endl;
         else if (args[1] == "..")
         {
-            if (directoryStack.back() != 5)
+            if (directoryStack.back().ID != 5)
+            {
                 directoryStack.pop_back();
-            return 1;
+                entries.clear();
+                getCurrDir(directoryStack.back().ID);
+            }
         }
         else
         {
-            int entryID;
-            if (validateInputDirectory(args[1], directoryStack.back(), entryID))
-                directoryStack.push_back(entryID);
+            Entry entry;
+            if (validateInputDirectory(entry, args[1]))
+            {
+                directoryStack.push_back(entry);
+                entries.clear();
+                getCurrDir(directoryStack.back().ID);
+            }
         }
     }
     else if (args[0] == "cat")
@@ -308,32 +305,31 @@ int handleCommands(vector<string> args)
     return 1;
 }
 
-bool validateInputDirectory(string input, int parentID, int &ID)
+bool validateInputDirectory(Entry &entry, string input)
 {
-    Entry entryInfos = findEntryInfos(input, directoryStack.back());
+    entry = findEntry(input);
     bool valid = true;
 
-    if (entryInfos.ID < 0)
+    if (entry.ID < 0)
     {
         cout << "Can not find " << input << endl;
         valid = false;
     }
-    else if (!entryInfos.isDir)
+    else if (!entry.isDir)
     {
         cout << input << " is not directory" << endl;
         valid = false;
     }
-    else
-        ID = entryInfos.ID;
 
     return valid;
 }
 
-Entry findEntryInfos(string dirName, int parentID)
+Entry findEntry(string dirName)
 {
+    int parentID = directoryStack.back().ID;
     for (auto entry : entries)
     {
-        if (entry.parentID == parentID && entry.entryName == dirName)
+        if (entry.entryName == dirName && entry.parentID == parentID)
             return entry;
     }
 
@@ -342,7 +338,7 @@ Entry findEntryInfos(string dirName, int parentID)
 
 // void readFileContent(string input)
 // {
-//     Entry entryInfos = findEntryInfos(input, directoryStack.back());
+//     Entry entryInfos = findEntry(input, directoryStack.back());
 
 //     if (entryInfos.ID < 0)
 //     {
@@ -383,10 +379,20 @@ Entry findEntryInfos(string dirName, int parentID)
 //     cout << endl;
 // }
 
+void init()
+{
+    Entry entry;
+    getNthEntryAndWriteToFile(5);
+    readEntry(entry);
+
+    directoryStack.push_back(entry);
+    getCurrDir(directoryStack.back().ID);
+}
+
 int main(int argc, char **argv)
 {
-    getCurrDir(5);
-    printCurrDir();
+    init();
+    menu();
 
     return 0;
 }

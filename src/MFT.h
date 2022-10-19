@@ -118,17 +118,18 @@ void readStandardInformation(EntryBuffers &buffers, int offset);
 void readFileNameAttribute(EntryBuffers &buffers, int offset);
 void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset);
 void readFileName(EntryBuffers &buffers, FILE *fp);
-void parseFileName(Entry &entry, EntryBuffers buffers);
+void parseFileName(Entry &entry, EntryBuffers &buffers);
 void parseParentIDs(Entry &entry, EntryBuffers &buffers);
 void parseEntryFlags(Entry &entry, EntryBuffers &buffers);
 
 void printEntry(Entry entry);
 
+void printDirStack();
 vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
-void printDirStack();
+
+bool validateInputDirectory(Entry &entry, string input);
+Entry findEntry(string dirName);
+
 void readFileContent(string input);
-void releaseFileNameBuffer();
-bool validateInputDirectory(string input, int parentID, int &ID);
-Entry findEntryInfos(string dirName, int parentID);
 void printFileContent(FILE *fp, int currentOffset);
