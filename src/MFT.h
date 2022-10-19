@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <cwchar>
 #include <iostream>
-#include <regex>
 #include <sstream>
 #include <stdio.h>
 #include <string>
@@ -37,6 +36,8 @@ struct EntryHeader
     uint16_t nextAttrID;
     uint16_t unused;
     uint32_t ID;
+    uint16_t updateSeqNumber;
+    uint32_t updateSeqArray;
 };
 
 struct StandardAttributeHeader
@@ -89,32 +90,43 @@ struct DataAttributeHeader
     uint64_t initializedSize;
 };
 
-struct EntryInfos
+struct EntryBuffers
 {
+    EntryHeader EH;
+    StandardAttributeHeader SAH;
+    FileNameAttribute FNA;
+    uint16_t *fileNameBuffer = nullptr;
+};
+struct Entry
+{
+
     string entryName;
-    int ID = -1;
-    int parentID;
+    unsigned int ID = -1;
+    unsigned int parentID;
     int isDir;
     int isUsed;
 };
 
+void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024]);
 void writeEntryToFile(BYTE entry[1024]);
-void readEntry(tuple<int, int> &flags, unsigned int &parentID);
-void printEntry(tuple<int, int> tp);
-void saveEntryInfos(int parentID, tuple<int, int> flags);
-void readEntryHeader();
-tuple<int, int> readEntryFlags(uint16_t flags);
-void readStandardAttributeHeader(FILE *fp, int &currentOffset);
-void readStandardInformation(int &currentOffset);
-void readFileNameAttribute(int &currentOffset);
-unsigned int readParentID(char parentID[6]);
-void readFileName(FILE *fp, int fileNameLength);
-void printFileName(int fileNameLength);
+
+void readEntry(Entry &entry);
+void readEntryHeader(EntryBuffers &buffers, int &offset);
+void readStandardInformation(EntryBuffers &buffers, int &offset);
+void readFileNameAttribute(EntryBuffers &buffers, int &offset);
+void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int &currentOffset);
+void readFileName(EntryBuffers &buffers, FILE *fp);
+void parseFileName(Entry &entry, EntryBuffers buffers);
+void parseParentIDs(Entry &entry, EntryBuffers &buffers);
+void parseEntryFlags(Entry &entry, EntryBuffers &buffers);
+
+void printEntry(Entry entry);
+
 vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
-void printCurrDir();
+void printDirStack();
 void readFileContent(string input);
 void releaseFileNameBuffer();
 bool validateInputDirectory(string input, int parentID, int &ID);
-EntryInfos findEntryInfos(string dirName, int parentID);
+Entry findEntryInfos(string dirName, int parentID);
 void printFileContent(FILE *fp, int currentOffset);

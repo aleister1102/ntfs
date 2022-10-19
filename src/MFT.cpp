@@ -1,12 +1,21 @@
 #include "MFT.h"
 
-EntryHeader EH;
-StandardAttributeHeader SAH;
-FileNameAttribute FNA;
-
-uint16_t *currentFileName = nullptr;
 vector<int> directoryStack = {5};
-vector<EntryInfos> directoryEntries;
+vector<Entry> entries;
+
+void getNthEntryAndWriteToFile(int entryOffset = 0)
+{
+    BYTE buffer[1024];
+    LARGE_INTEGER li;
+
+    uint64_t startSector = START_CLUSTER * SECTOR_PER_CLUSTER * SECTOR_SIZE;
+    uint64_t bypassSector = entryOffset * 2 * SECTOR_SIZE;
+    uint64_t readSector = startSector + bypassSector;
+    li.QuadPart = readSector;
+
+    getEntry(CURRENT_DRIVE, li.LowPart, &li.HighPart, buffer);
+    writeEntryToFile(buffer);
+}
 
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
 {
@@ -40,19 +49,6 @@ void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, B
     }
 }
 
-void getNthEntryAndWriteToFile(BYTE entry[1024], int entryOffset = 0)
-{
-    LARGE_INTEGER li;
-
-    uint64_t startSector = START_CLUSTER * SECTOR_PER_CLUSTER * SECTOR_SIZE;
-    uint64_t bypassSector = entryOffset * 2 * SECTOR_SIZE;
-    uint64_t readSector = startSector + bypassSector;
-    li.QuadPart = readSector;
-
-    getEntry(CURRENT_DRIVE, li.LowPart, &li.HighPart, entry);
-    writeEntryToFile(entry);
-}
-
 void writeEntryToFile(BYTE entry[1024])
 {
     FILE *fp = fopen(ENTRY_FILENAME, "wb");
@@ -60,153 +56,122 @@ void writeEntryToFile(BYTE entry[1024])
     fclose(fp);
 }
 
-void getCurrDir(unsigned int currDirID = 5)
+void getCurrDir(int currDirID = 5)
 {
-    cout << "-----------------------------------------------------------------------------" << endl;
-    cout << "Type\tStatus\t\tID\tName" << endl;
-
     // Khi nào thì MFT kết thúc?
     for (int i = 0; i < 100; i++)
     {
-        BYTE entry[1024];
-        tuple<int, int> flags;
-        unsigned int parentID;
+        Entry entry;
 
-        getNthEntryAndWriteToFile(entry, i);
-        readEntry(flags, parentID);
+        getNthEntryAndWriteToFile(i);
+        readEntry(entry);
 
-        if (parentID == currDirID && currentFileName)
+        // Tìm các entry có tên và nằm trong thư mục hiện tại
+        if (entry.parentID == currDirID && entry.entryName != "")
         {
             // Bỏ qua các entry không phải là file hoặc thư mục
-            if (!EH.ID && i > 0)
+            if (!entry.ID && i > 0)
                 continue;
-
-            saveEntryInfos(parentID, flags);
-            printEntry(flags);
+            else
+                entries.push_back(entry);
         }
-        parentID = -1;
     }
-
-    cout << "-----------------------------------------------------------------------------" << endl;
 }
 
-void readEntry(tuple<int, int> &flags, unsigned int &parentID)
-{
-    int currentOffset = STANDARD_INFORMATION_OFFSET;
-
-    readEntryHeader();
-    flags = readEntryFlags(EH.flags);
-    readStandardInformation(currentOffset);
-    readFileNameAttribute(currentOffset);
-    parentID = readParentID(FNA.parentID);
-}
-
-void printEntry(tuple<int, int> tp)
+void printEntry(Entry entry)
 {
     // Loại và trạng thái của entry
-    string isDir = get<0>(tp) ? "dir" : "file";
+    string isDir = entry.isDir ? "dir" : "file";
     cout << isDir << "\t";
-    string isUsed = get<1>(tp) ? "being used" : "";
+    string isUsed = entry.isUsed ? "being used" : "";
     cout << isUsed << "\t";
 
     // ID của entry
-    cout << EH.ID << "\t";
+    cout << entry.ID << "\t";
 
     // Tên của entry
-    printFileName(FNA.fileNameLength);
-    releaseFileNameBuffer();
-    cout << endl;
+    cout << entry.entryName << endl;
 }
 
-void saveEntryInfos(int parentID, tuple<int, int> flags)
-{
-    EntryInfos EI;
-
-    // Chuyển tên của entry thành string
-    char *buffer = new char[FNA.fileNameLength + 1];
-    for (int i = 0; i < FNA.fileNameLength; i++)
-        buffer[i] = (char)currentFileName[i];
-    buffer[FNA.fileNameLength] = '\0';
-
-    EI.entryName = buffer;
-    EI.ID = EH.ID;
-    EI.parentID = parentID;
-    EI.isDir = get<0>(flags);
-    EI.isUsed = get<1>(flags);
-
-    directoryEntries.push_back(EI);
-}
-
-void readEntryHeader()
+void readEntryHeader(EntryBuffers &buffers, int &offset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    fread(&EH, sizeof(EH), 1, fp);
+    fread(&buffers.EH, sizeof(buffers.EH), 1, fp);
     fclose(fp);
+
+    offset += buffers.EH.offsetToFirstAttr;
 }
 
-tuple<int, int> readEntryFlags(uint16_t flags)
-{
-    // Bit 0: trạng thái sử dụng
-    int isUsed = flags & 1;
-    // Bit 1: loại entry (tập tin hoặc thư mục)
-    flags = flags >> 1;
-    int isDir = flags & 1;
-
-    return make_tuple(isDir, isUsed);
-}
-
-void readStandardInformation(int &currentOffset)
+void readStandardInformation(EntryBuffers &buffers, int &offset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    readStandardAttributeHeader(fp, currentOffset);
+    readStandardAttributeHeader(buffers, fp, offset);
     fclose(fp);
+
+    offset += buffers.SAH.totalLength;
 }
 
-void readFileNameAttribute(int &currentOffset)
+void readFileNameAttribute(EntryBuffers &buffers, int &offset)
 {
     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    readStandardAttributeHeader(fp, currentOffset);
+    readStandardAttributeHeader(buffers, fp, offset);
 
-    if (SAH.attributeType != 48)
+    if (buffers.SAH.attributeType != 48)
         return;
 
-    fread(&FNA, sizeof(FNA), 1, fp);
-    readFileName(fp, FNA.fileNameLength);
+    fread(&buffers.FNA, sizeof(buffers.FNA), 1, fp);
+    readFileName(buffers, fp);
     fclose(fp);
+
+    offset += buffers.SAH.totalLength;
 }
 
-void readStandardAttributeHeader(FILE *fp, int &currentOffset)
+void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int &offset)
 {
-    fseek(fp, currentOffset, SEEK_SET);
-    fread(&SAH, sizeof(SAH), 1, fp);
-    currentOffset += SAH.totalLength;
+    fseek(fp, offset, SEEK_SET);
+    fread(&buffers.SAH, sizeof(buffers.SAH), 1, fp);
 }
 
-uint32_t readParentID(char parentID[6])
+void readFileName(EntryBuffers &buffers, FILE *fp)
 {
+    buffers.fileNameBuffer = new uint16_t[100];
+
+    for (int i = 0; i < buffers.FNA.fileNameLength; i++)
+        fread(&buffers.fileNameBuffer[i], 2, 1, fp);
+}
+
+void parseFileName(Entry &entry, EntryBuffers buffers)
+{
+    int fileNameLength = buffers.FNA.fileNameLength;
+
+    char *buffer = new char[fileNameLength + 1];
+    for (int i = 0; i < fileNameLength; i++)
+        buffer[i] = (char)buffers.fileNameBuffer[i];
+    buffer[fileNameLength] = '\0';
+
+    entry.entryName = string(buffer);
+    delete[] buffers.fileNameBuffer;
+}
+
+void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
+{
+    uint16_t flags = buffers.EH.flags;
+
+    // Bit 0: trạng thái sử dụng
+    entry.isUsed = flags & 1;
+    // Bit 1: loại entry (tập tin hoặc thư mục)
+    flags = flags >> 1;
+    entry.isDir = flags & 1;
+}
+
+void parseParentIDs(Entry &entry, EntryBuffers &buffers)
+{
+    char *parentID = buffers.FNA.parentID;
+
     uint32_t buffer;
     memcpy(&buffer, parentID, 6);
-    return buffer;
-}
-
-void readFileName(FILE *fp, int fileNameLength)
-{
-    currentFileName = new uint16_t[100];
-
-    for (int i = 0; i < fileNameLength; i++)
-        fread(&currentFileName[i], 2, 1, fp);
-}
-
-void printFileName(int fileNameLength)
-{
-    for (int i = 0; i < fileNameLength; i++)
-        cout << (char)currentFileName[i];
-}
-
-void releaseFileNameBuffer()
-{
-    delete[] currentFileName;
-    currentFileName = nullptr;
+    entry.parentID = buffer;
+    entry.ID = buffers.EH.ID;
 }
 
 void readDataAttribute(int currOffset)
@@ -221,6 +186,34 @@ void readDataAttribute(int currOffset)
     currOffset += DH.totalLength;
 }
 
+void readEntry(Entry &entry)
+{
+    int offset = 0;
+    EntryBuffers buffers;
+
+    readEntryHeader(buffers, offset);
+    readStandardInformation(buffers, offset);
+    readFileNameAttribute(buffers, offset);
+
+    if (buffers.fileNameBuffer != nullptr)
+    {
+        parseFileName(entry, buffers);
+    }
+    parseEntryFlags(entry, buffers);
+    parseParentIDs(entry, buffers);
+}
+
+void printCurrDir()
+{
+    cout << "-----------------------------------------------------------------------------" << endl;
+    cout << "Type\tStatus\t\tID\tName" << endl;
+
+    for (auto entry : entries)
+        printEntry(entry);
+
+    cout << "-----------------------------------------------------------------------------" << endl;
+}
+
 void menu()
 {
     int running = true;
@@ -228,7 +221,7 @@ void menu()
     do
     {
         wcout << CURRENT_DRIVE[4] << "\\";
-        printCurrDir();
+        printDirStack();
 
         string command;
         getline(cin, command);
@@ -237,18 +230,18 @@ void menu()
     } while (running);
 }
 
-void printCurrDir()
+void printDirStack()
 {
     for (int i = 0; i < directoryStack.size(); i++)
     {
         int dirID = directoryStack.at(i);
-        for (int i = 0; i < directoryEntries.size(); i++)
+        for (int i = 0; i < entries.size(); i++)
         {
-            if (directoryEntries.at(i).ID == dirID)
+            if (entries.at(i).ID == dirID)
             {
-                if (directoryEntries.at(i).entryName != ".")
+                if (entries.at(i).entryName != ".")
                 {
-                    cout << directoryEntries.at(i).entryName << "\\";
+                    cout << entries.at(i).entryName << "\\";
                     break;
                 }
             }
@@ -302,7 +295,7 @@ int handleCommands(vector<string> args)
         else
         {
             string input = args[1];
-            readFileContent(input);
+            // readFileContent(input);
         }
     }
     else if (args[0] == "exit")
@@ -315,7 +308,7 @@ int handleCommands(vector<string> args)
 
 bool validateInputDirectory(string input, int parentID, int &ID)
 {
-    EntryInfos entryInfos = findEntryInfos(input, directoryStack.back());
+    Entry entryInfos = findEntryInfos(input, directoryStack.back());
     bool valid = true;
 
     if (entryInfos.ID < 0)
@@ -334,63 +327,64 @@ bool validateInputDirectory(string input, int parentID, int &ID)
     return valid;
 }
 
-EntryInfos findEntryInfos(string dirName, int parentID)
+Entry findEntryInfos(string dirName, int parentID)
 {
-    for (auto entry : directoryEntries)
+    for (auto entry : entries)
     {
         if (entry.parentID == parentID && entry.entryName == dirName)
             return entry;
     }
 
-    return EntryInfos();
+    return Entry();
 }
 
-void readFileContent(string input)
-{
-    EntryInfos entryInfos = findEntryInfos(input, directoryStack.back());
+// void readFileContent(string input)
+// {
+//     Entry entryInfos = findEntryInfos(input, directoryStack.back());
 
-    if (entryInfos.ID < 0)
-    {
-        cout << "Can not find " << input << endl;
-        return;
-    }
+//     if (entryInfos.ID < 0)
+//     {
+//         cout << "Can not find " << input << endl;
+//         return;
+//     }
 
-    BYTE entry[1024];
-    FILE *fp = fopen(ENTRY_FILENAME, "rb");
-    int currentOffset = STANDARD_INFORMATION_OFFSET;
+//     BYTE entry[1024];
+//     FILE *fp = fopen(ENTRY_FILENAME, "rb");
+//     int offset = STANDARD_INFORMATION_OFFSET;
 
-    getNthEntryAndWriteToFile(entry, entryInfos.ID);
-    readEntryHeader();
+//     getNthEntryAndWriteToFile(entryInfos.ID);
+//     readEntryHeader();
 
-    do
-    {
-        if (SAH.attributeType == 0x80)
-            printFileContent(fp, currentOffset);
+//     do
+//     {
+//         if (SAH.attributeType == 0x80)
+//             printFileContent(fp, offset);
 
-        readStandardAttributeHeader(fp, currentOffset);
+//         readStandardAttributeHeader(fp, offset);
+//         // offset += SAH.totalLength;
 
-    } while (SAH.attributeType != 0xFFFFFFFF);
-}
+//     } while (SAH.attributeType != 0xFFFFFFFF);
+// }
 
-void printFileContent(FILE *fp, int currentOffset)
-{
-    int dataOffset = currentOffset - SAH.totalLength + sizeof(StandardAttributeHeader);
-    fseek(fp, dataOffset, SEEK_SET);
+// void printFileContent(FILE *fp, int currentOffset)
+// {
+//     int dataOffset = currentOffset - SAH.totalLength + sizeof(StandardAttributeHeader);
+//     fseek(fp, dataOffset, SEEK_SET);
 
-    char buffer;
-    for (int i = 0; i < SAH.attrDataLength; i++)
-    {
-        fread(&buffer, 1, 1, fp);
-        cout << buffer;
-    }
+//     char buffer;
+//     for (int i = 0; i < SAH.attrDataLength; i++)
+//     {
+//         fread(&buffer, 1, 1, fp);
+//         cout << buffer;
+//     }
 
-    cout << endl;
-}
+//     cout << endl;
+// }
 
 int main(int argc, char **argv)
 {
-    getCurrDir();
-    menu();
+    getCurrDir(5);
+    printCurrDir();
 
     return 0;
 }
