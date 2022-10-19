@@ -98,9 +98,9 @@ void readEntry(Entry &entry)
         {
             readFileNameAttribute(buffers, offset);
 
-            parseFileName(entry, buffers);
-            parseEntryFlags(entry, buffers);
             parseParentIDs(entry, buffers);
+            parseEntryFlags(entry, buffers);
+            parseFileName(entry, buffers);
         }
 
         offset += length;
@@ -156,23 +156,6 @@ void readFileName(EntryBuffers &buffers, FILE *fp)
         fread(&buffers.fileNameBuffer[i], 2, 1, fp);
 }
 
-void parseFileName(Entry &entry, EntryBuffers &buffers)
-{
-    int fileNameLength = buffers.FNA.fileNameLength;
-
-    // Chuyển tên file thành mảng char
-    char *buffer = new char[fileNameLength + 1];
-    for (int i = 0; i < fileNameLength; i++)
-        buffer[i] = (char)buffers.fileNameBuffer[i];
-    buffer[fileNameLength] = '\0';
-
-    // Giải phóng bộ nhớ cũ
-    buffers.fileNameBuffer = nullptr;
-    delete[] buffers.fileNameBuffer;
-
-    entry.entryName = string(buffer);
-}
-
 void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
 {
     uint16_t flags = buffers.EH.flags;
@@ -192,6 +175,23 @@ void parseParentIDs(Entry &entry, EntryBuffers &buffers)
     memcpy(&buffer, parentID, 6);
     entry.parentID = buffer;
     entry.ID = buffers.EH.ID;
+}
+
+void parseFileName(Entry &entry, EntryBuffers &buffers)
+{
+    int fileNameLength = buffers.FNA.fileNameLength;
+
+    // Chuyển tên file thành mảng char
+    char *buffer = new char[fileNameLength + 1];
+    for (int i = 0; i < fileNameLength; i++)
+        buffer[i] = (char)buffers.fileNameBuffer[i];
+    buffer[fileNameLength] = '\0';
+
+    // Giải phóng bộ nhớ cũ
+    buffers.fileNameBuffer = nullptr;
+    delete[] buffers.fileNameBuffer;
+
+    entry.entryName = string(buffer);
 }
 
 void printCurrDir()
@@ -279,7 +279,8 @@ int handleCommands(vector<string> args)
         else
         {
             Entry entry;
-            if (validateInputDirectory(entry, args[1]))
+            string input = args[1];
+            if (validateInputDirectory(entry, input))
             {
                 directoryStack.push_back(entry);
                 entries.clear();
@@ -293,8 +294,12 @@ int handleCommands(vector<string> args)
             cout << "Missing input" << endl;
         else
         {
+            Entry entry;
             string input = args[1];
-            // readFileContent(input);
+            if (validateTextFile(entry, input))
+            {
+                printTextFileContent(entry);
+            }
         }
     }
     else if (args[0] == "exit")
@@ -308,19 +313,7 @@ int handleCommands(vector<string> args)
 bool validateInputDirectory(Entry &entry, string input)
 {
     entry = findEntry(input);
-    bool valid = true;
-
-    if (entry.ID < 0)
-    {
-        cout << "Can not find " << input << endl;
-        valid = false;
-    }
-    else if (!entry.isDir)
-    {
-        cout << input << " is not directory" << endl;
-        valid = false;
-    }
-
+    bool valid = checkExistence(entry, input) && checkDirectory(entry);
     return valid;
 }
 
@@ -336,48 +329,47 @@ Entry findEntry(string dirName)
     return Entry();
 }
 
-// void readFileContent(string input)
-// {
-//     Entry entryInfos = findEntry(input, directoryStack.back());
+bool checkExistence(Entry entry, string input)
+{
+    if (entry.ID == 0xFFFFFFFF)
+    {
+        cout << "Can not find " << input << endl;
+        return false;
+    }
+    return true;
+}
 
-//     if (entryInfos.ID < 0)
-//     {
-//         cout << "Can not find " << input << endl;
-//         return;
-//     }
+bool checkDirectory(Entry entry)
+{
+    if (!entry.isDir)
+    {
+        cout << entry.entryName << " is not directory" << endl;
+        return false;
+    }
+    return true;
+}
 
-//     BYTE entry[1024];
-//     FILE *fp = fopen(ENTRY_FILENAME, "rb");
-//     int offset = STANDARD_INFORMATION_OFFSET;
+bool validateTextFile(Entry &entry, string input)
+{
+    entry = findEntry(input);
+    bool valid = checkExistence(entry, input) && checkTextFile(entry);
+    return valid;
+}
 
-//     getNthEntryAndWriteToFile(entryInfos.ID);
-//     readEntryHeader();
+bool checkTextFile(Entry entry)
+{
+    if (entry.entryName.substr(entry.entryName.length() - 4) != ".txt")
+    {
+        cout << entry.entryName << " is not a text file" << endl;
+        return false;
+    }
+    return true;
+}
 
-//     do
-//     {
-//         if (SAH.attributeType == 0x80)
-//             printFileContent(fp, offset);
-
-//         readStandardAttributeHeader(fp, offset);
-//         // offset += SAH.totalLength;
-
-//     } while (SAH.attributeType != 0xFFFFFFFF);
-// }
-
-// void printFileContent(FILE *fp, int currentOffset)
-// {
-//     int dataOffset = currentOffset - SAH.totalLength + sizeof(StandardAttributeHeader);
-//     fseek(fp, dataOffset, SEEK_SET);
-
-//     char buffer;
-//     for (int i = 0; i < SAH.attrDataLength; i++)
-//     {
-//         fread(&buffer, 1, 1, fp);
-//         cout << buffer;
-//     }
-
-//     cout << endl;
-// }
+void printTextFileContent(Entry entry)
+{
+    
+}
 
 void init()
 {
