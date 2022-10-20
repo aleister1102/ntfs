@@ -1,5 +1,5 @@
-# File System
-Chương trình đọc bảng MFT của phân vùng NTFS.
+# NTFS 
+Chương trình đọc phân vùng NTFS.
 
 Các câu lệnh:
 - `dir`: liệt kê các tập tin/thư mục có trong thư mục hiện tại.
