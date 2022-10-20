@@ -429,6 +429,7 @@ void initMFT()
     Entry entry;
     getNthEntryAndWriteToFile(ROOT_DIR);
     readEntry(entry);
+    directoryStack.push_back(entry);
 
     // Lấy số lượng entry tối đa của bảng MFT
     getMFTLimit();
