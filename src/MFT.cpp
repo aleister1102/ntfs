@@ -1,9 +1,10 @@
 #include "MFT.h"
+#include "NTFS.h"
 
 vector<Entry> directoryStack;
 vector<Entry> entries;
 
-void getNthEntryAndWriteToFile(int entryOffset = 0)
+void getNthEntryAndWriteToFile(int entryOffset)
 {
     BYTE buffer[1024];
 
@@ -11,11 +12,11 @@ void getNthEntryAndWriteToFile(int entryOffset = 0)
     uint64_t bypassSector = entryOffset * 2 * SECTOR_SIZE;
     uint64_t readPoint = startSector + bypassSector;
 
-    getEntry(CURRENT_DRIVE, readPoint, buffer);
-    writeEntryToFile(buffer);
+    if (getEntry(CURRENT_DRIVE, readPoint, buffer))
+        writeEntryToFile(buffer);
 }
 
-void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024])
+int getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024])
 {
     int retCode = 0;
     DWORD bytesRead;
@@ -32,7 +33,7 @@ void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024])
     if (device == INVALID_HANDLE_VALUE) // Open Error
     {
         printf("CreateFile: %u\n", GetLastError());
-        return;
+        return 0;
     }
 
     if (readPoint <= LONG_MAX)
@@ -52,10 +53,12 @@ void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024])
     if (!ReadFile(device, buffer, 1024, &bytesRead, NULL))
     {
         printf("ReadFile: %u\n", GetLastError());
+        return 0;
     }
     else
     {
         // printf("Success!\n");
+        return 1;
     }
 }
 
@@ -289,7 +292,7 @@ void printEntry(Entry entry)
     cout << entry.entryName << endl;
 }
 
-void menu()
+void runCommandLines()
 {
     int running = true;
 
@@ -420,19 +423,18 @@ bool checkDirectory(Entry entry)
     return true;
 }
 
-void init()
+void initMFT()
 {
     // Lấy thông tin của thư mục gốc
     Entry entry;
     getNthEntryAndWriteToFile(ROOT_DIR);
     readEntry(entry);
-    directoryStack.push_back(entry);
 
     // Lấy số lượng entry tối đa của bảng MFT
     getMFTLimit();
 
     // Lấy các entry của thư mục gốc
-    getCurrDir(directoryStack.back().ID);
+    getCurrDir(entry.ID);
 }
 
 void getMFTLimit()
@@ -443,11 +445,4 @@ void getMFTLimit()
 
     int MFT_CLUSTERS = entry.dataRuns.at(0).clusterCount;
     MFT_LIMIT = MFT_CLUSTERS * SECTOR_PER_CLUSTER / 2;
-}
-
-int main(int argc, char **argv)
-{
-    init();
-    menu();
-    return 0;
 }

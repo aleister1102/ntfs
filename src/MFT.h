@@ -1,37 +1,20 @@
 #define UNICODE
-#pragma pack(1) // Yêu cầu compiler cấp phát bộ nhớ đúng với kdl (không padding)
+#pragma pack(1)
 
 #include <cstdint>
 #include <cwchar>
+#include <iomanip>
 #include <iostream>
 #include <limits.h>
 #include <sstream>
+#include <stack>
+#include <stdint.h>
 #include <stdio.h>
 #include <string>
 #include <tuple>
 #include <vector>
 #include <windows.h>
 using namespace std;
-
-const wchar_t *CURRENT_DRIVE = L"\\\\.\\U:";
-
-// Các thông số cơ bản của MFT
-int ROOT_DIR = 5;
-int $MFT_INDEX = 0;
-int MFT_LIMIT = 0;
-
-// Signature của các attribute
-unsigned int FILE_NAME = 0x30;
-unsigned int DATA = 0x80;
-unsigned int END_MARKER = 0xFFFFFFFF;
-
-// Tên tập tin lưu entry
-const char *ENTRY_FILENAME = "entry.bin";
-
-// Ba hằng số dưới đây là lấy từ phần VBR
-long long START_CLUSTER = 786432;
-long SECTOR_PER_CLUSTER = 8;
-long SECTOR_SIZE = 512;
 
 struct EntryHeader
 {
@@ -68,22 +51,6 @@ struct StandardAttributeHeader
     uint8_t padding;
 };
 
-struct FileNameAttribute
-{
-    char parentID[6];
-    char parentSeqNum[2];
-    uint64_t fileCreated;
-    uint64_t fileModified;
-    uint64_t MFTChanged;
-    uint64_t lastAccess;
-    uint64_t allocatedSize;
-    uint64_t realSize;
-    uint32_t fileAttributes;
-    uint32_t reparse;
-    uint8_t fileNameLength;
-    uint8_t fileNameFormat;
-};
-
 struct NonResidentDataAttributeHeader
 {
     uint32_t attributeType;
@@ -101,6 +68,22 @@ struct NonResidentDataAttributeHeader
     uint64_t allocatedSize;
     uint64_t realSize;
     uint64_t initializedSize;
+};
+
+struct FileNameAttribute
+{
+    char parentID[6];
+    char parentSeqNum[2];
+    uint64_t fileCreated;
+    uint64_t fileModified;
+    uint64_t MFTChanged;
+    uint64_t lastAccess;
+    uint64_t allocatedSize;
+    uint64_t realSize;
+    uint32_t fileAttributes;
+    uint32_t reparse;
+    uint8_t fileNameLength;
+    uint8_t fileNameFormat;
 };
 
 struct DataRun
@@ -131,7 +114,8 @@ struct Entry
     vector<DataRun> dataRuns;
 };
 
-void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024]);
+int getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024]);
+void getNthEntryAndWriteToFile(int entryOffset = 0);
 void writeEntryToFile(BYTE entry[1024]);
 
 // Entry header
@@ -172,3 +156,6 @@ bool checkDirectory(Entry entry);
 
 // Lấy số entry tối đa
 void getMFTLimit();
+
+void initMFT();
+void runCommandLines();
