@@ -157,5 +157,5 @@ bool checkDirectory(Entry entry);
 // Lấy số entry tối đa
 void getMFTLimit();
 
-void initMFT();
+void initRootDirectory();
 void runCommandLines();

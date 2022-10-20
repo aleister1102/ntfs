@@ -423,7 +423,7 @@ bool checkDirectory(Entry entry)
     return true;
 }
 
-void initMFT()
+void initRootDirectory()
 {
     // Lấy thông tin của thư mục gốc
     Entry entry;
@@ -431,7 +431,6 @@ void initMFT()
     readEntry(entry);
     directoryStack.push_back(entry);
 
-    // Lấy số lượng entry tối đa của bảng MFT
     getMFTLimit();
 
     // Lấy các entry của thư mục gốc

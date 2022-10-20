@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     print(NTFS_PBS);
 
     // Hiển thị cây thư mục và đọc tập tin
-    initMFT();
+    initRootDirectory();
     runCommandLines();
 
     return 0;
