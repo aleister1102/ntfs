@@ -70,44 +70,34 @@ void getCurrDir(int currDirID = ROOT_DIR)
     }
 }
 
-void getMFTLimit()
-{
-    Entry entry;
-    getNthEntryAndWriteToFile($MFT_INDEX);
-    readEntry(entry);
-
-    int MFT_CLUSTERS = entry.dataRuns.at(0).clusterCount;
-    MFT_LIMIT = MFT_CLUSTERS * SECTOR_PER_CLUSTER / 2;
-}
-
 void readEntry(Entry &entry)
 {
     int offset = 0;
     EntryBuffers buffers;
     uint32_t signature = 0, length = 0;
+    uint8_t nonResidentFlag = 0;
 
     readEntryHeader(buffers, offset);
+    parseEntryFlags(entry, buffers);
     do
     {
-        readAttributeSignatureAndLength(signature, length, offset);
-        // Standard Information
-        if (signature == STANDARD_INFO)
-        {
-            readStandardInformation(buffers, offset);
-        }
+        readAttributeIdentifiers(signature, length, nonResidentFlag, offset);
+
         // File name
-        else if (signature == FILE_NAME)
+        if (signature == FILE_NAME)
         {
             readFileNameAttribute(buffers, offset);
 
             parseParentIDs(entry, buffers);
-            parseEntryFlags(entry, buffers);
             parseFileName(entry, buffers);
         }
-        // Data của $MFT
-        else if (signature == DATA && entry.ID == $MFT_INDEX)
+        // Data
+        else if (signature == DATA)
         {
-            readDataRuns(entry, offset);
+            if (nonResidentFlag)
+                readNonResidentData(buffers, entry, offset);
+            else
+                readResidentData(buffers, entry, offset);
         }
 
         offset += length;
@@ -123,12 +113,24 @@ void readEntryHeader(EntryBuffers &buffers, int &offset)
     offset += buffers.EH.offsetToFirstAttr;
 }
 
-void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int offset)
+void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
+{
+    auto flags = buffers.EH.flags;
+
+    // Bit 0: trạng thái sử dụng
+    entry.isUsed = flags & 1;
+    // Bit 1: loại entry (tập tin hoặc thư mục)
+    flags = flags >> 1;
+    entry.isDir = flags & 1;
+}
+
+void readAttributeIdentifiers(uint32_t &signature, uint32_t &length, uint8_t &nonResidentFlag, int offset)
 {
     auto fp = fopen(ENTRY_FILENAME, "rb");
     fseek(fp, offset, SEEK_SET);
     fread(&signature, sizeof(signature), 1, fp);
     fread(&length, sizeof(length), 1, fp);
+    fread(&nonResidentFlag, sizeof(nonResidentFlag), 1, fp);
     fclose(fp);
 }
 
@@ -136,13 +138,6 @@ void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset)
 {
     fseek(fp, offset, SEEK_SET);
     fread(&buffers.SAH, sizeof(buffers.SAH), 1, fp);
-}
-
-void readStandardInformation(EntryBuffers &buffers, int offset)
-{
-    auto fp = fopen(ENTRY_FILENAME, "rb");
-    readStandardAttributeHeader(buffers, fp, offset);
-    fclose(fp);
 }
 
 void readFileNameAttribute(EntryBuffers &buffers, int offset)
@@ -157,49 +152,10 @@ void readFileNameAttribute(EntryBuffers &buffers, int offset)
 
 void readFileName(EntryBuffers &buffers, FILE *fp)
 {
-    buffers.fileNameBuffer = new uint16_t[100];
+    buffers.fileNameBuffer = new uint16_t[buffers.FNA.fileNameLength];
 
     for (int i = 0; i < buffers.FNA.fileNameLength; i++)
-        fread(&buffers.fileNameBuffer[i], 2, 1, fp);
-}
-
-void readDataRuns(Entry &entry, int offset)
-{
-    auto fp = fopen(ENTRY_FILENAME, "rb");
-    fseek(fp, offset + sizeof(DataAttributeHeader), SEEK_SET);
-
-    uint8_t size = 0;
-    do
-    {
-        fread(&size, sizeof(size), 1, fp);
-
-        if (size == 0)
-            break;
-
-        int clusterCountSize = size & 0xF;
-        int clusterOffsetSize = (size >> 4) & 0xF;
-
-        DataRun DR;
-        // Lấy 4 bit thấp, là số lượng cluster dành cho data run
-        fread(&DR.clusterCount, clusterCountSize, 1, fp);
-        // Lấy 4 bit cao, là cluster bắt đầu của data run
-        fread(&DR.clusterOffset, clusterOffsetSize, 1, fp);
-
-        entry.dataRuns.push_back(DR);
-    } while (size != 0x0);
-
-    fclose(fp);
-}
-
-void parseEntryFlags(Entry &entry, EntryBuffers &buffers)
-{
-    auto flags = buffers.EH.flags;
-
-    // Bit 0: trạng thái sử dụng
-    entry.isUsed = flags & 1;
-    // Bit 1: loại entry (tập tin hoặc thư mục)
-    flags = flags >> 1;
-    entry.isDir = flags & 1;
+        fread(&buffers.fileNameBuffer[i], sizeof(uint16_t), 1, fp);
 }
 
 void parseParentIDs(Entry &entry, EntryBuffers &buffers)
@@ -224,10 +180,77 @@ void parseFileName(Entry &entry, EntryBuffers &buffers)
     buffer[fileNameLength] = '\0';
 
     // Giải phóng bộ nhớ cũ
+    delete buffers.fileNameBuffer;
     buffers.fileNameBuffer = nullptr;
-    delete[] buffers.fileNameBuffer;
 
     entry.entryName = string(buffer);
+}
+
+void readNonResidentDataAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset)
+{
+    fseek(fp, offset, SEEK_SET);
+    fread(&buffers.NRDAH, sizeof(buffers.NRDAH), 1, fp);
+}
+
+void readNonResidentData(EntryBuffers &buffers, Entry &entry, int offset)
+{
+    auto fp = fopen(ENTRY_FILENAME, "rb");
+    readNonResidentDataAttributeHeader(buffers, fp, offset);
+    readDataRuns(entry, fp);
+    fclose(fp);
+}
+
+void readDataRuns(Entry &entry, FILE *fp)
+{
+    uint8_t size = 0;
+    do
+    {
+        fread(&size, sizeof(size), 1, fp);
+
+        if (size == 0)
+            break;
+
+        int clusterCountSize = size & 0xF;
+        int clusterOffsetSize = (size >> 4) & 0xF;
+
+        DataRun DR;
+        // Lấy 4 bit thấp, là số lượng cluster dành cho data run
+        fread(&DR.clusterCount, clusterCountSize, 1, fp);
+        // Lấy 4 bit cao, là cluster bắt đầu của data run
+        fread(&DR.clusterOffset, clusterOffsetSize, 1, fp);
+
+        entry.dataRuns.push_back(DR);
+    } while (size != 0x0);
+
+    fclose(fp);
+}
+
+void readResidentData(EntryBuffers &buffers, Entry &entry, int offset)
+{
+    auto fp = fopen(ENTRY_FILENAME, "rb");
+    readStandardAttributeHeader(buffers, fp, offset);
+
+    // Xử lý trường hợp attribute có tên
+    if (buffers.SAH.nameLength)
+        fseek(fp, offset + buffers.SAH.offsetToAttrData, SEEK_SET);
+    if (buffers.SAH.attrDataLength)
+        readData(buffers, entry, fp);
+    fclose(fp);
+}
+
+void readData(EntryBuffers &buffers, Entry &entry, FILE *fp)
+{
+    int dataLength = buffers.SAH.attrDataLength;
+    char *data = new char[dataLength]{0};
+    int i = 0;
+
+    do
+    {
+        fread(&data[i], sizeof(char), 1, fp);
+    } while (data[i++] != 0x00);
+
+    fclose(fp);
+    entry.data += (string)data;
 }
 
 void printCurrDir()
@@ -404,14 +427,15 @@ bool checkTextFile(Entry entry)
 void readTextFile(Entry &entry)
 {
     int offset = 0;
-    uint32_t signature = 0, length = 0;
     EntryBuffers buffers;
+    uint32_t signature = 0, length = 0;
+    uint8_t nonResidentFlag = 0;
 
     getNthEntryAndWriteToFile(entry.ID);
     readEntryHeader(buffers, offset);
     do
     {
-        readAttributeSignatureAndLength(signature, length, offset);
+        readAttributeIdentifiers(signature, length, nonResidentFlag, offset);
         if (signature == DATA)
             readTextData(buffers, entry, offset);
 
@@ -445,6 +469,16 @@ void init()
 
     // Lấy các entry của thư mục gốc
     getCurrDir(directoryStack.back().ID);
+}
+
+void getMFTLimit()
+{
+    Entry entry;
+    getNthEntryAndWriteToFile($MFT_INDEX);
+    readEntry(entry);
+
+    int MFT_CLUSTERS = entry.dataRuns.at(0).clusterCount;
+    MFT_LIMIT = MFT_CLUSTERS * SECTOR_PER_CLUSTER / 2;
 }
 
 int main(int argc, char **argv)

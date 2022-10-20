@@ -20,7 +20,6 @@ int $MFT_INDEX = 0;
 int MFT_LIMIT = 0;
 
 // Signature của các attribute
-unsigned int STANDARD_INFO = 0x10;
 unsigned int FILE_NAME = 0x30;
 unsigned int DATA = 0x80;
 unsigned int END_MARKER = 0xFFFFFFFF;
@@ -84,7 +83,7 @@ struct FileNameAttribute
     uint8_t fileNameFormat;
 };
 
-struct DataAttributeHeader
+struct NonResidentDataAttributeHeader
 {
     uint32_t attributeType;
     uint32_t totalLength;
@@ -113,9 +112,13 @@ struct EntryBuffers
 {
     EntryHeader EH;
     StandardAttributeHeader SAH;
+    NonResidentDataAttributeHeader NRDAH;
+
     FileNameAttribute FNA;
     uint16_t *fileNameBuffer = nullptr;
+    uint16_t *attrNameBuffer = nullptr;
 };
+
 struct Entry
 {
     string entryName;
@@ -130,23 +133,29 @@ struct Entry
 void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024]);
 void writeEntryToFile(BYTE entry[1024]);
 
+// Entry header
 void readEntry(Entry &entry);
 void readEntryHeader(EntryBuffers &buffers, int &offset);
-void readAttributeSignatureAndLength(uint32_t &signature, uint32_t &length, int offset);
+void parseEntryFlags(Entry &entry, EntryBuffers &buffers);
 
+// Attribute header
+void readAttributeIdentifiers(uint32_t &signature, uint32_t &length, uint8_t &nonResidentFlag, int offset);
 void readStandardAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset);
 
-void readStandardInformation(EntryBuffers &buffers, int offset);
+// File name
 void readFileNameAttribute(EntryBuffers &buffers, int offset);
 void readFileName(EntryBuffers &buffers, FILE *fp);
-
-void readDataRuns(Entry &entry, int offset);
-
-void parseEntryFlags(Entry &entry, EntryBuffers &buffers);
 void parseParentIDs(Entry &entry, EntryBuffers &buffers);
 void parseFileName(Entry &entry, EntryBuffers &buffers);
-void parseData(Entry &entry, EntryBuffers &buffers);
 
+// Data
+void readNonResidentDataAttributeHeader(EntryBuffers &buffers, FILE *fp, int offset);
+void readNonResidentData(EntryBuffers &buffers, Entry &entry, int offset);
+void readDataRuns(Entry &entry, FILE *fp);
+void readResidentData(EntryBuffers &buffers, Entry &entry, int offset);
+void readData(EntryBuffers &buffers, Entry &entry, FILE *fp);
+
+// Xuất ra thông tin của entry
 void printEntry(Entry entry);
 
 // Kiểm soát các câu lệnh
@@ -165,3 +174,6 @@ bool validateTextFile(Entry &entry, string input);
 bool checkTextFile(Entry entry);
 void readTextFile(Entry &entry);
 void readTextData(EntryBuffers &buffers, Entry &entry, int offset);
+
+// Lấy số entry tối đa
+void getMFTLimit();
