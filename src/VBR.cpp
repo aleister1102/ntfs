@@ -1,5 +1,8 @@
+#define UNICODE
+
 #include <iomanip>
 #include <iostream>
+#include <limits.h>
 #include <stack>
 #include <stdint.h>
 #include <stdio.h>
@@ -12,41 +15,6 @@ struct Information
     BYTE *sector = NULL;
     int length = 0;
     LONG base10_value = -1; // if information needed integer value, then store, -1 for default
-};
-
-struct File_Name_Attribute
-{
-    // Define header of attribute
-    int type;
-    int length;
-    string name;   // From type -> name
-    bool resilent; // 0 for non-resilent, 1 for resilent
-    int offset_to_data;
-    // Data
-    int file_attribute;
-    string file_name;
-};
-
-struct Data_Attribute
-{
-    // Define header of attribute
-    int type;
-    int length;
-    string name;   // From type -> name
-    bool resilent; // 0 for non-resilent, 1 for resilent
-    int offset_to_data;
-    // Data
-    int length_of_file;
-    string content;
-};
-
-struct MFT_Entry
-{
-    Information signature;
-    Information offset_first_attribute;
-    Information flag; // is folder or file
-    File_Name_Attribute file_name_attribute;
-    Data_Attribute data_attribute;
 };
 
 const size_t vWORD = 2;
@@ -107,6 +75,7 @@ int ReadSector(LPCWSTR drive, int64_t readPoint, BYTE sector[512])
         printf("Success!\n");
     }
 }
+
 string convertBase10ToBase16(short number)
 {
     string result;
@@ -135,6 +104,7 @@ string convertBase10ToBase16(short number)
     }
     return result;
 }
+
 void convertInformationToInt(Information &info)
 {
     string s = "0x";
@@ -146,7 +116,6 @@ void convertInformationToInt(Information &info)
     int value = stoi(s, nullptr, 0);
     info.base10_value = value;
 }
-//////////////////////////////////////////
 
 Information extract(BYTE *sector, size_t start, size_t length)
 {
@@ -273,27 +242,6 @@ void print(NTFS_Partition_Boot_Sector ntfs)
     printInfomation(ntfs.cluster_per_file_record);
 }
 
-/////////////////////////////////////////////////////////////////////
-LONG get_cluster_per_file_record(NTFS_Partition_Boot_Sector ntfs)
-{
-    return ntfs.cluster_per_file_record.base10_value;
-}
-
-int64_t convertClusterToBytes(LONG cluster_starter, NTFS_Partition_Boot_Sector ntfs)
-{
-    return (int64_t)cluster_starter * ntfs.sectors_per_cluster.base10_value * ntfs.bytes_per_sector.base10_value;
-}
-
-//////////////////////////////////////////////////////////////////
-
-void printSector(BYTE *sector, size_t start, size_t length)
-{
-    for (size_t i = start; i < start + length; i++)
-    {
-        cout << convertBase10ToBase16(sector[i]) << " ";
-    }
-}
-//----------//
 string convertBase10ToBase2(int64_t num)
 {
     string res{};
@@ -321,89 +269,15 @@ LONG convertBase2ToBase10(string s, bool part)
 
     return result;
 }
-//-------------------//
-
-//#########################//
-// FILE READER for one record
-Information read_signature(BYTE *sector)
-{
-    Information sig = extract(sector, stoi("0x00", nullptr, 0), vDWORD);
-
-    return sig;
-}
-
-Information read_offset_first_attribute(BYTE *sector)
-{
-    Information ofa = extract(sector, stoi("0x14", nullptr, 0), vWORD);
-    convertInformationToInt(ofa);
-
-    return ofa;
-}
-
-MFT_Entry readMFT(BYTE *sector)
-{
-    MFT_Entry entry;
-    entry.signature = read_signature(sector);
-    entry.offset_first_attribute = read_offset_first_attribute(sector);
-
-    return entry;
-}
-
-void getAttribute(MFT_Entry &entry, BYTE *sector)
-{
-    LONG first_attribute = entry.offset_first_attribute.base10_value;
-    // Extract: Type of attribute
-    Information type = extract(sector, first_attribute, vDWORD);
-    convertInformationToInt(type);
-    if (type.base10_value == 48)
-    { // File Name
-    }
-    else if (type.base10_value == 128)
-    { // Data
-    }
-}
-
-void printMFT(MFT_Entry entry)
-{
-    cout << "Signature: ";
-    printInfomation(entry.signature);
-    cout << "Offset First Attribute: ";
-    printInfomation(entry.offset_first_attribute);
-}
-//##########################//
 
 int main(int argc, char **argv)
 {
-    /*
     // Cau 1
     int64_t readPoint = 0;
     BYTE sector[512];
-    ReadSector(L"\\\\.\\E:", 0, sector);
+    ReadSector(L"\\\\.\\U:", 0, sector);
     NTFS_Partition_Boot_Sector ntfs = read(sector);
+    print(ntfs);
 
-
-    // Cau 2
-    BYTE mft_sector[1024];
-    LONG start_mft = ntfs.logical_cluster_number_mft.base10_value;
-    readPoint = convertClusterToBytes(start_mft, ntfs);
-    //cout << "Start MFT: " << start_mft << "\nReadPoint: " << readPoint;
-    ReadSector(L"\\\\.\\E:", readPoint, mft_sector);
-
-    MFT_Entry entry = readMFT(mft_sector);
-    printMFT(entry);
-
-
-
-    int k = 0;
-    for (short i : mft_sector) {
-        string base_16 = convertBase10ToBase16(i);
-        cout << setw(3) << base_16;
-        k++;
-        if (k > 16) {
-            k = 0;
-            cout << endl;
-        }
-    }
-    */
     return 0;
 }

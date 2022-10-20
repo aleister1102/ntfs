@@ -15,7 +15,7 @@ void getNthEntryAndWriteToFile(int entryOffset = 0)
     writeEntryToFile(buffer);
 }
 
-void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE entry[1024])
+void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024])
 {
     int retCode = 0;
     DWORD bytesRead;
@@ -37,16 +37,19 @@ void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE entry[1024])
 
     if (readPoint <= LONG_MAX)
     {
-        SetFilePointer(device, readPoint, NULL, FILE_BEGIN); // Set a Point to Read when Distance is smaller than LONG_MAX
+        // Set a Point to Read when Distance is smaller than LONG_MAX
+        SetFilePointer(device, readPoint, NULL, FILE_BEGIN);
     }
     else
     {
         LARGE_INTEGER li;
         li.QuadPart = readPoint;
-        SetFilePointer(device, li.LowPart, &li.HighPart, FILE_BEGIN); // Set a Point to Read when Distance is bigger than LONG_MAX
+
+        // Set a Point to Read when Distance is bigger than LONG_MAX
+        SetFilePointer(device, li.LowPart, &li.HighPart, FILE_BEGIN);
     }
 
-    if (!ReadFile(device, entry, 1024, &bytesRead, NULL))
+    if (!ReadFile(device, buffer, 1024, &bytesRead, NULL))
     {
         printf("ReadFile: %u\n", GetLastError());
     }

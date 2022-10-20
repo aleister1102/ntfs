@@ -131,7 +131,7 @@ struct Entry
     vector<DataRun> dataRuns;
 };
 
-void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE entry[1024]);
+void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE buffer[1024]);
 void writeEntryToFile(BYTE entry[1024]);
 
 // Entry header
