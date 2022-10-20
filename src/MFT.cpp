@@ -269,7 +269,7 @@ void readData(EntryBuffers &buffers, Entry &entry, FILE *fp)
 void printCurrDir()
 {
     cout << "-----------------------------------------------------------------------------" << endl;
-    cout << "Type\tStatus\t\tID\tName" << endl;
+    cout << "Type\tID\tName" << endl;
 
     for (auto entry : entries)
         printEntry(entry);
@@ -281,15 +281,17 @@ void printEntry(Entry entry)
 {
     // Loại và trạng thái của entry
     string isDir = entry.isDir ? "dir" : "file";
-    cout << isDir << "\t";
-    string isUsed = entry.isUsed ? "being used" : "";
-    cout << isUsed << "\t";
 
-    // ID của entry
-    cout << entry.ID << "\t";
+    if (entry.isUsed)
+    {
+        cout << isDir << "\t";
 
-    // Tên của entry
-    cout << entry.entryName << endl;
+        // ID của entry
+        cout << entry.ID << "\t";
+
+        // Tên của entry
+        cout << entry.entryName << endl;
+    }
 }
 
 void runCommandLines()
