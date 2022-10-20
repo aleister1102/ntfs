@@ -164,16 +164,10 @@ vector<string> split(const string &s, char delim = ' ');
 int handleCommands(vector<string> args);
 Entry findEntry(string dirName);
 
-// Câu lệnh "cd"
+// Validate input
 bool validateInputDirectory(Entry &entry, string input);
 bool checkExistence(Entry entry, string input);
 bool checkDirectory(Entry entry);
-
-// Câu lệnh "cat"
-bool validateTextFile(Entry &entry, string input);
-bool checkTextFile(Entry entry);
-void readTextFile(Entry &entry);
-void readTextData(EntryBuffers &buffers, Entry &entry, int offset);
 
 // Lấy số entry tối đa
 void getMFTLimit();

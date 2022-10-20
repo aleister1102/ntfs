@@ -308,6 +308,9 @@ vector<string> split(const string &s, char delim)
     stringstream ss(s);
     string item;
 
+    if (s == "")
+        result.push_back("");
+
     while (getline(ss, item, delim))
         result.push_back(item);
 
@@ -337,6 +340,7 @@ int handleCommands(vector<string> args)
         {
             Entry entry;
             string input = args[1];
+
             if (validateInputDirectory(entry, input))
             {
                 directoryStack.push_back(entry);
@@ -353,11 +357,10 @@ int handleCommands(vector<string> args)
         {
             Entry entry;
             string input = args[1];
-            if (validateTextFile(entry, input))
-            {
-                readTextFile(entry);
+
+            entry = findEntry(input);
+            if (checkExistence(entry, input))
                 cout << entry.data << endl;
-            }
         }
     }
     else if (args[0] == "exit")
@@ -405,55 +408,6 @@ bool checkDirectory(Entry entry)
         return false;
     }
     return true;
-}
-
-bool validateTextFile(Entry &entry, string input)
-{
-    entry = findEntry(input);
-    bool valid = checkExistence(entry, input) && checkTextFile(entry);
-    return valid;
-}
-
-bool checkTextFile(Entry entry)
-{
-    if (entry.entryName.substr(entry.entryName.length() - 4) != ".txt")
-    {
-        cout << entry.entryName << " is not a text file" << endl;
-        return false;
-    }
-    return true;
-}
-
-void readTextFile(Entry &entry)
-{
-    int offset = 0;
-    EntryBuffers buffers;
-    uint32_t signature = 0, length = 0;
-    uint8_t nonResidentFlag = 0;
-
-    getNthEntryAndWriteToFile(entry.ID);
-    readEntryHeader(buffers, offset);
-    do
-    {
-        readAttributeIdentifiers(signature, length, nonResidentFlag, offset);
-        if (signature == DATA)
-            readTextData(buffers, entry, offset);
-
-        offset += length;
-    } while (signature != END_MARKER);
-}
-
-void readTextData(EntryBuffers &buffers, Entry &entry, int offset)
-{
-    auto fp = fopen(ENTRY_FILENAME, "rb");
-    readStandardAttributeHeader(buffers, fp, offset);
-
-    char *data = new char[buffers.SAH.attrDataLength];
-    fread(data, buffers.SAH.attrDataLength, 1, fp);
-    fclose(fp);
-
-    data[buffers.SAH.attrDataLength] = '\0';
-    entry.data += (string)data;
 }
 
 void init()
