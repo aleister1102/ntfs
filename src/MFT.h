@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cwchar>
 #include <iostream>
+#include <limits.h>
 #include <sstream>
 #include <stdio.h>
 #include <string>
@@ -130,7 +131,7 @@ struct Entry
     vector<DataRun> dataRuns;
 };
 
-void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024]);
+void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE entry[1024]);
 void writeEntryToFile(BYTE entry[1024]);
 
 // Entry header

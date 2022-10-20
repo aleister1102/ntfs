@@ -6,18 +6,16 @@ vector<Entry> entries;
 void getNthEntryAndWriteToFile(int entryOffset = 0)
 {
     BYTE buffer[1024];
-    LARGE_INTEGER li;
 
     uint64_t startSector = START_CLUSTER * SECTOR_PER_CLUSTER * SECTOR_SIZE;
     uint64_t bypassSector = entryOffset * 2 * SECTOR_SIZE;
-    uint64_t readSector = startSector + bypassSector;
-    li.QuadPart = readSector;
+    uint64_t readPoint = startSector + bypassSector;
 
-    getEntry(CURRENT_DRIVE, li.LowPart, &li.HighPart, buffer);
+    getEntry(CURRENT_DRIVE, readPoint, buffer);
     writeEntryToFile(buffer);
 }
 
-void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, BYTE entry[1024])
+void getEntry(LPCWSTR drive, uint64_t readPoint, BYTE entry[1024])
 {
     int retCode = 0;
     DWORD bytesRead;
@@ -37,7 +35,16 @@ void getEntry(LPCWSTR drive, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, B
         return;
     }
 
-    SetFilePointer(device, lDistanceToMove, lpDistanceToMoveHigh, FILE_BEGIN); // Set a Point to Read
+    if (readPoint <= LONG_MAX)
+    {
+        SetFilePointer(device, readPoint, NULL, FILE_BEGIN); // Set a Point to Read when Distance is smaller than LONG_MAX
+    }
+    else
+    {
+        LARGE_INTEGER li;
+        li.QuadPart = readPoint;
+        SetFilePointer(device, li.LowPart, &li.HighPart, FILE_BEGIN); // Set a Point to Read when Distance is bigger than LONG_MAX
+    }
 
     if (!ReadFile(device, entry, 1024, &bytesRead, NULL))
     {
